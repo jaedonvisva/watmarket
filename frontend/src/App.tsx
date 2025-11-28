@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Moon, Sun } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
+import logoDark from './assets/watmarket_dark.png';
+import logoLight from './assets/watmarket_light.png';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Lines from './pages/Lines';
@@ -29,6 +33,7 @@ function Clock() {
 
 function Sidebar() {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const location = useLocation();
 
   if (!user) return null;
@@ -38,7 +43,14 @@ function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
-        <Link to="/" className="brand">WatMarket</Link>
+        <Link to="/" className="brand-link">
+          <img 
+            src={theme === 'dark' ? logoDark : logoLight} 
+            alt="WatMarket" 
+            className="brand-logo" 
+            style={{ height: '48px', objectFit: 'contain' }}
+          />
+        </Link>
       </div>
 
       <div className="sidebar-nav">
@@ -56,6 +68,28 @@ function Sidebar() {
       </div>
 
       <div className="sidebar-footer">
+        <button 
+          onClick={toggleTheme} 
+          className="theme-toggle-btn"
+          style={{ 
+            marginBottom: '1rem',
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border)',
+            color: 'var(--text-secondary)',
+            padding: '0.5rem',
+            borderRadius: '0.25rem',
+            cursor: 'pointer'
+          }}
+        >
+          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+        </button>
+
         <Clock />
         <div className="user-balance">
           <span className="label">Balance</span>
@@ -103,9 +137,11 @@ function AppRoutes() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

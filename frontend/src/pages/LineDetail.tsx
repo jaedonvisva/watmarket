@@ -126,6 +126,13 @@ export default function LineDetail() {
 
       {line.description && <p className="line-description">{line.description}</p>}
       
+      <div className="headline-stats">
+        <div className="headline-primary">
+          <span className="headline-percentage yes">{(line.odds.yes_probability * 100).toFixed(0)}%</span>
+          <span className="headline-label">chance of Yes</span>
+        </div>
+      </div>
+
       <PriceChart data={history} />
       
       {error && <div className="error">{error}</div>}
