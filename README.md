@@ -38,169 +38,28 @@ A university-specific prediction market platform where users bet karma on yes/no
 
 ---
 
-## API Reference
+## Architecture & Implementation
 
-### Authentication
+- **Backend (FastAPI + Supabase)**
+  - FastAPI app exposes REST endpoints under `/users`, `/lines`, and `/bets`.
+  - Supabase Auth handles email/password accounts; a `users` table stores karma balances and `is_admin`.
+  - Business logic is split into routers and services:
+    - `users`: registration, login, current user, and transaction history.
+    - `lines`: CRUD-style operations for prediction lines plus dynamic odds and resolution.
+    - `bets`: placing bets, listing a user’s bets, and per-line positions.
+  - Supabase Postgres tables (`users`, `lines`, `bets`, `transactions`, `price_history`) hold all state, with RLS enforcing per-user access.
 
-#### Register
-```http
-POST /users/register
-Content-Type: application/json
+- **Frontend (React + Vite)**
+  - React SPA with React Router routes for markets list, line detail, portfolio dashboard, auth pages, and admin create line.
+  - `AuthContext` wraps the app, storing the logged-in user and JWT in `localStorage` and attaching it as a Bearer token.
+  - A typed Axios client (`api/client.ts`) talks to the FastAPI API, using `VITE_API_URL` as the base URL.
+  - Pages use this client to fetch lines, bets, transactions, and to place bets or resolve lines.
 
-{
-  "email": "user@example.com",
-  "password": "password123"
-}
-```
-
-**Response:**
-```json
-{
-  "access_token": "eyJ...",
-  "token_type": "bearer",
-  "user": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "karma_balance": 1000,
-    "is_admin": false,
-    "created_at": "2024-01-01T00:00:00Z"
-  }
-}
-```
-
-#### Login
-```http
-POST /users/login
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "password123"
-}
-```
-
-#### Get Current User
-```http
-GET /users/me
-Authorization: Bearer <token>
-```
-
----
-
-### Lines
-
-#### Get All Lines
-```http
-GET /lines
-Authorization: Bearer <token>
-```
-
-**Query params:**
-- `resolved` (optional): `true` or `false`
-
-**Response:**
-```json
-[
-  {
-    "id": "uuid",
-    "title": "Will it rain tomorrow?",
-    "description": "Based on local weather",
-    "closes_at": "2024-12-31T23:59:59Z",
-    "yes_stake": 500,
-    "no_stake": 300,
-    "resolved": false,
-    "correct_outcome": null,
-    "created_at": "2024-01-01T00:00:00Z",
-    "odds": {
-      "yes_probability": 0.6219,
-      "no_probability": 0.3781,
-      "yes_odds": 1.6078,
-      "no_odds": 2.6447
-    }
-  }
-]
-```
-
-#### Create Line (Admin)
-```http
-POST /lines
-Authorization: Bearer <admin_token>
-Content-Type: application/json
-
-{
-  "title": "Will the cafeteria serve pizza on Friday?",
-  "description": "Main campus cafeteria only",
-  "closes_at": "2024-12-20T12:00:00Z"
-}
-```
-
-#### Resolve Line (Admin)
-```http
-POST /lines/{id}/resolve
-Authorization: Bearer <admin_token>
-Content-Type: application/json
-
-{
-  "correct_outcome": "yes"
-}
-```
-
-**Response:**
-```json
-{
-  "line_id": "uuid",
-  "correct_outcome": "yes",
-  "total_bets": 10,
-  "winners": 6,
-  "losers": 4,
-  "total_winning_stake": 600,
-  "total_losing_stake": 400,
-  "payouts": [
-    {
-      "user_id": "uuid",
-      "bet_id": "uuid",
-      "original_stake": 100,
-      "payout": 166
-    }
-  ]
-}
-```
-
----
-
-### Bets
-
-#### Place Bet
-```http
-POST /bets/place
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "line_id": "uuid",
-  "outcome": "yes",
-  "stake": 100
-}
-```
-
-**Response:**
-```json
-{
-  "id": "uuid",
-  "user_id": "uuid",
-  "line_id": "uuid",
-  "outcome": "yes",
-  "stake": 100,
-  "created_at": "2024-01-01T00:00:00Z",
-  "potential_payout": 160.78
-}
-```
-
-#### Get My Bets
-```http
-GET /bets/my
-Authorization: Bearer <token>
-```
+- **Interaction flow**
+  - Users register/login → receive JWT from backend (Supabase) → frontend stores it.
+  - Authenticated requests hit FastAPI, which uses Supabase admin client to read/write Postgres.
+  - Betting updates `bets`, adjusts `users.karma_balance`, and appends to `transactions`.
+  - Resolving a line computes payouts, updates balances, and writes payout transactions.
 
 ---
 
@@ -263,64 +122,3 @@ When a line is resolved:
 4. Each winner receives: `original_stake + (stake/total_winning_stake) * losing_pot`
 
 ---
-
-## Making a User Admin
-
-Run this SQL in Supabase SQL Editor:
-
-```sql
-UPDATE public.users 
-SET is_admin = true 
-WHERE email = 'admin@example.com';
-```
-
----
-
-## Project Structure
-
-```
-watmarket/
-├── backend/
-│   ├── app/
-│   │   ├── __init__.py
-│   │   ├── main.py           # FastAPI app
-│   │   ├── config.py         # Settings
-│   │   ├── database.py       # Supabase clients
-│   │   ├── models/
-│   │   │   └── schemas.py    # Pydantic models
-│   │   ├── routers/
-│   │   │   ├── users.py      # Auth endpoints
-│   │   │   ├── lines.py      # Lines endpoints
-│   │   │   └── bets.py       # Bets endpoints
-│   │   └── services/
-│   │       ├── auth.py       # Auth helpers
-│   │       ├── odds.py       # Odds calculator
-│   │       └── resolver.py   # Payout resolver
-│   ├── requirements.txt
-│   └── .env.example
-├── frontend/
-│   ├── src/
-│   │   ├── api/
-│   │   │   └── client.ts     # API client
-│   │   ├── context/
-│   │   │   └── AuthContext.tsx
-│   │   ├── pages/
-│   │   │   ├── Login.tsx
-│   │   │   ├── Register.tsx
-│   │   │   ├── Lines.tsx
-│   │   │   ├── LineDetail.tsx
-│   │   │   ├── CreateLine.tsx
-│   │   │   └── Dashboard.tsx
-│   │   ├── App.tsx
-│   │   └── App.css
-│   └── .env.example
-└── README.md
-```
-
----
-
-## Supabase Project Info
-
-- **Project**: prediction-market
-- **URL**: https://edaaoxnxopywyrnoqyse.supabase.co
-- **Region**: us-east-2
