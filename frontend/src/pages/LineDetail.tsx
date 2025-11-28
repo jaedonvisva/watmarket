@@ -20,6 +20,8 @@ export default function LineDetail() {
   // Bet form
   const [outcome, setOutcome] = useState<'yes' | 'no'>('yes');
   const [stake, setStake] = useState(100);
+  const [targetShares, setTargetShares] = useState(100);
+  const [buyMode, setBuyMode] = useState<'amount' | 'shares'>('amount');
   const [betting, setBetting] = useState(false);
 
   // Resolve form (admin)
@@ -58,7 +60,10 @@ export default function LineDetail() {
     e.preventDefault();
     if (!line || !user) return;
 
-    if (stake > user.karma_balance) {
+    // Calculate actual stake to send
+    const finalStake = buyMode === 'amount' ? stake : Math.ceil(calculateCostForShares(targetShares, outcome));
+
+    if (finalStake > user.karma_balance) {
       setError(`Insufficient funds. Balance: ${user.karma_balance}`);
       return;
     }
@@ -67,7 +72,7 @@ export default function LineDetail() {
     setError('');
 
     try {
-      await betsApi.place(line.id, outcome, stake);
+      await betsApi.place(line.id, outcome, finalStake);
       await Promise.all([fetchData(), refreshUser()]);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Order failed';
@@ -104,6 +109,51 @@ export default function LineDetail() {
 
   const isOpen = line && !line.resolved && new Date(line.closes_at) > now;
 
+  const calculateEstShares = (invest: number, out: 'yes' | 'no') => {
+    if (!line) return 0;
+    const k = line.yes_pool * line.no_pool;
+    let shares = 0;
+    if (out === 'yes') {
+      const newNo = line.no_pool + invest;
+      const newYes = k / newNo;
+      shares = invest + (line.yes_pool - newYes);
+    } else {
+      const newYes = line.yes_pool + invest;
+      const newNo = k / newYes;
+      shares = invest + (line.no_pool - newNo);
+    }
+    return shares;
+  };
+
+  const calculateCostForShares = (shares: number, out: 'yes' | 'no') => {
+    if (!line) return 0;
+    // Quadratic: I^2 + I(Y+N-S) - SN = 0
+    // I = Investment/Cost
+    const Y = out === 'yes' ? line.yes_pool : line.no_pool;
+    const N = out === 'yes' ? line.no_pool : line.yes_pool;
+    
+    const a = 1;
+    const b = Y + N - shares;
+    const c = -shares * N;
+    
+    const delta = b*b - 4*a*c;
+    if (delta < 0) return 0;
+    
+    const I = (-b + Math.sqrt(delta)) / (2*a);
+    return I;
+  };
+
+  // Estimates based on mode
+  const estShares = buyMode === 'amount' 
+    ? calculateEstShares(stake, outcome)
+    : targetShares;
+    
+  const estCost = buyMode === 'amount'
+    ? stake
+    : calculateCostForShares(targetShares, outcome);
+
+  const estPrice = estShares > 0 ? estCost / estShares : 0;
+
   if (loading) return <div className="loading">Loading market data...</div>;
   if (!line) return <div className="error">Market not found</div>;
 
@@ -116,7 +166,7 @@ export default function LineDetail() {
       <div className="market-title-section">
         <h1>{line.title}</h1>
         <div className="market-stats">
-          <span>Volume: {line.yes_stake + line.no_stake}</span>
+          <span>Liquidity: {(line.yes_pool + line.no_pool).toFixed(0)}</span>
           <span>Ends: {formatDate(line.closes_at)}</span>
           <span className={`status-badge ${line.resolved ? 'resolved' : isOpen ? 'open' : 'closed'}`}>
             {line.resolved ? 'Resolved' : isOpen ? 'Trading Open' : 'Trading Closed'}
@@ -145,7 +195,7 @@ export default function LineDetail() {
         >
           <h3>Buy Yes</h3>
           <div className="big-percentage">{(line.odds.yes_probability * 100).toFixed(0)}%</div>
-          <div className="price-info">Price: {line.odds.yes_odds.toFixed(2)}x</div>
+          <div className="price-info">Price: ${line.odds.yes_probability.toFixed(2)}</div>
         </div>
 
         <div 
@@ -154,26 +204,46 @@ export default function LineDetail() {
         >
           <h3>Buy No</h3>
           <div className="big-percentage">{(line.odds.no_probability * 100).toFixed(0)}%</div>
-          <div className="price-info">Price: {line.odds.no_odds.toFixed(2)}x</div>
+          <div className="price-info">Price: ${line.odds.no_probability.toFixed(2)}</div>
         </div>
       </div>
 
       {isOpen && user && (
         <div className="order-form">
           <h3>New Order: Buy {outcome.toUpperCase()}</h3>
+          
+          <div className="mode-toggle" style={{marginBottom: '1rem'}}>
+            <label style={{marginRight: '1rem'}}>
+              <input 
+                type="radio" 
+                checked={buyMode === 'amount'} 
+                onChange={() => setBuyMode('amount')}
+              /> By Amount (Cost)
+            </label>
+            <label>
+              <input 
+                type="radio" 
+                checked={buyMode === 'shares'} 
+                onChange={() => setBuyMode('shares')}
+              /> By Shares
+            </label>
+          </div>
+
           <form onSubmit={handlePlaceBet}>
             <div className="input-group">
-              <label>Amount (WARRIORS)</label>
+              <label>{buyMode === 'amount' ? 'Amount (WARRIORS)' : 'Target Shares'}</label>
               <input
                 type="number"
                 min={1}
-                max={user.karma_balance}
-                value={stake}
-                onChange={(e) => setStake(Number(e.target.value))}
+                max={buyMode === 'amount' ? user.karma_balance : undefined}
+                value={buyMode === 'amount' ? stake : targetShares}
+                onChange={(e) => buyMode === 'amount' ? setStake(Number(e.target.value)) : setTargetShares(Number(e.target.value))}
               />
             </div>
             <div className="order-summary">
-               <p>Est. Payout: <strong>{(stake * (outcome === 'yes' ? line.odds.yes_odds : line.odds.no_odds)).toFixed(0)}</strong></p>
+               <p>Est. Shares: <strong>{estShares.toFixed(2)}</strong></p>
+               <p>Cost: <strong>{estCost.toFixed(2)}</strong></p>
+               <p>Avg Price: <strong>${estPrice.toFixed(2)}</strong></p>
                <p className="balance">Available: {user.karma_balance}</p>
             </div>
             <button 
@@ -208,7 +278,9 @@ export default function LineDetail() {
             <thead>
               <tr>
                 <th>Side</th>
-                <th>Size</th>
+                <th>Shares</th>
+                <th>Avg Price</th>
+                <th>Cost</th>
                 <th>Value</th>
                 <th>Time</th>
               </tr>
@@ -217,6 +289,8 @@ export default function LineDetail() {
               {myBets.map((bet) => (
                 <tr key={bet.id}>
                   <td className={bet.outcome}>{bet.outcome.toUpperCase()}</td>
+                  <td>{bet.shares?.toFixed(2) || '-'}</td>
+                  <td>{bet.buy_price ? '$' + bet.buy_price.toFixed(2) : '-'}</td>
                   <td>{bet.stake}</td>
                   <td>{bet.potential_payout?.toFixed(0) || '-'}</td>
                   <td>{formatDate(bet.created_at)}</td>

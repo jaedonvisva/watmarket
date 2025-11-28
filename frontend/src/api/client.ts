@@ -52,8 +52,8 @@ export interface Line {
   title: string;
   description: string | null;
   closes_at: string;
-  yes_stake: number;
-  no_stake: number;
+  yes_pool: number;
+  no_pool: number;
   resolved: boolean;
   correct_outcome: 'yes' | 'no' | null;
   created_at: string;
@@ -66,8 +66,11 @@ export interface Bet {
   line_id: string;
   outcome: 'yes' | 'no';
   stake: number;
+  shares?: number;
   created_at: string;
   potential_payout: number | null;
+  buy_price?: number;
+  payout?: number;
 }
 
 export interface Transaction {
@@ -112,7 +115,7 @@ export const linesApi = {
   
   getHistory: (id: string) => api.get<PriceHistoryPoint[]>(`/lines/${id}/history`),
   
-  create: (data: { title: string; description?: string; closes_at: string }) =>
+  create: (data: { title: string; description?: string; closes_at: string; initial_liquidity?: number }) =>
     api.post<Line>('/lines', data),
   
   resolve: (id: string, correct_outcome: 'yes' | 'no') =>

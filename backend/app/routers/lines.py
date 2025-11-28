@@ -16,14 +16,14 @@ router = APIRouter(prefix="/lines", tags=["lines"])
 
 def _enrich_line_with_odds(line_data: dict) -> LineResponse:
     """Add calculated odds to line data."""
-    odds = calculate_odds(line_data["yes_stake"], line_data["no_stake"])
+    odds = calculate_odds(line_data["yes_pool"], line_data["no_pool"])
     return LineResponse(
         id=line_data["id"],
         title=line_data["title"],
         description=line_data["description"],
         closes_at=line_data["closes_at"],
-        yes_stake=line_data["yes_stake"],
-        no_stake=line_data["no_stake"],
+        yes_pool=line_data["yes_pool"],
+        no_pool=line_data["no_pool"],
         resolved=line_data["resolved"],
         correct_outcome=line_data["correct_outcome"],
         created_at=line_data["created_at"],
@@ -107,7 +107,9 @@ async def create_line(
         "title": line_data.title,
         "description": line_data.description,
         "closes_at": line_data.closes_at.isoformat(),
-        "created_by": str(current_user.id)
+        "created_by": str(current_user.id),
+        "yes_pool": line_data.initial_liquidity,
+        "no_pool": line_data.initial_liquidity
     }).execute()
     
     return _enrich_line_with_odds(result.data[0])

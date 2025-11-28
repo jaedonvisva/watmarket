@@ -52,49 +52,54 @@ def resolve_line(line_id: UUID, correct_outcome: str) -> Dict:
     winning_bets = [b for b in bets if b["outcome"] == correct_outcome]
     losing_bets = [b for b in bets if b["outcome"] != correct_outcome]
     
-    # Calculate total stakes
-    total_winning_stake = sum(b["stake"] for b in winning_bets)
-    total_losing_stake = sum(b["stake"] for b in losing_bets)
-    
-    # Calculate and distribute payouts
+    # Calculate payouts (CPMM: Payout = Shares * 1.0)
     payouts = []
     
     for bet in winning_bets:
-        # Each winner gets their stake back plus proportional share of losing stakes
-        if total_winning_stake > 0:
-            share = bet["stake"] / total_winning_stake
-            payout = bet["stake"] + int(total_losing_stake * share)
-        else:
-            payout = bet["stake"]
+        shares = bet.get("shares") or 0
+        # Karma is int, so we round the payout
+        payout = int(round(shares))
         
         payouts.append({
             "user_id": bet["user_id"],
             "bet_id": bet["id"],
-            "original_stake": bet["stake"],
+            "shares": shares,
             "payout": payout
         })
+        
+        # Update bet record with payout
+        admin_client.table("bets").update({
+            "payout": payout
+        }).eq("id", bet["id"]).execute()
+    
+    # Mark losing bets with 0 payout
+    for bet in losing_bets:
+        admin_client.table("bets").update({
+            "payout": 0
+        }).eq("id", bet["id"]).execute()
     
     # Update user balances and create transactions
     for payout_info in payouts:
         user_id = payout_info["user_id"]
         payout_amount = payout_info["payout"]
         
-        # Get current balance
-        user_result = admin_client.table("users").select("karma_balance").eq("id", user_id).single().execute()
-        current_balance = user_result.data["karma_balance"]
-        
-        # Update balance
-        admin_client.table("users").update({
-            "karma_balance": current_balance + payout_amount
-        }).eq("id", user_id).execute()
-        
-        # Create payout transaction
-        admin_client.table("transactions").insert({
-            "user_id": user_id,
-            "amount": payout_amount,
-            "type": "payout",
-            "reference_id": str(line_id)
-        }).execute()
+        if payout_amount > 0:
+            # Get current balance
+            user_result = admin_client.table("users").select("karma_balance").eq("id", user_id).single().execute()
+            current_balance = user_result.data["karma_balance"]
+            
+            # Update balance
+            admin_client.table("users").update({
+                "karma_balance": current_balance + payout_amount
+            }).eq("id", user_id).execute()
+            
+            # Create payout transaction
+            admin_client.table("transactions").insert({
+                "user_id": user_id,
+                "amount": payout_amount,
+                "type": "payout",
+                "reference_id": str(line_id)
+            }).execute()
     
     # Mark line as resolved
     admin_client.table("lines").update({
@@ -108,7 +113,6 @@ def resolve_line(line_id: UUID, correct_outcome: str) -> Dict:
         "total_bets": len(bets),
         "winners": len(winning_bets),
         "losers": len(losing_bets),
-        "total_winning_stake": total_winning_stake,
-        "total_losing_stake": total_losing_stake,
+        "total_payout": sum(p["payout"] for p in payouts),
         "payouts": payouts
     }

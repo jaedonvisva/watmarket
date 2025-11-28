@@ -10,6 +10,7 @@ export default function CreateLine() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [closesAt, setClosesAt] = useState('');
+  const [initialLiquidity, setInitialLiquidity] = useState(100);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -29,6 +30,7 @@ export default function CreateLine() {
         title,
         description: description || undefined,
         closes_at: new Date(closesAt).toISOString(),
+        initial_liquidity: initialLiquidity,
       });
       navigate(`/lines/${response.data.id}`);
     } catch (err: unknown) {
@@ -90,6 +92,21 @@ export default function CreateLine() {
             placeholder="Additional context or rules for this prediction..."
             rows={4}
           />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="liquidity">Initial Liquidity (Pool Depth)</label>
+          <input
+            id="liquidity"
+            type="number"
+            value={initialLiquidity}
+            onChange={(e) => setInitialLiquidity(Number(e.target.value))}
+            min={1}
+            required
+          />
+          <small style={{color: 'var(--text-secondary)', display: 'block', marginTop: '0.25rem'}}>
+            Higher liquidity means less price impact per trade. Default is 100.
+          </small>
         </div>
 
         <div className="form-group">

@@ -43,7 +43,7 @@ class LineBase(BaseModel):
 
 
 class LineCreate(LineBase):
-    pass
+    initial_liquidity: float = 100.0
 
 
 class LineOdds(BaseModel):
@@ -58,8 +58,8 @@ class LineResponse(BaseModel):
     title: str
     description: Optional[str]
     closes_at: datetime
-    yes_stake: int
-    no_stake: int
+    yes_pool: float
+    no_pool: float
     resolved: bool
     correct_outcome: Optional[Literal["yes", "no"]]
     created_at: datetime
@@ -89,6 +89,8 @@ class BetResponse(BaseModel):
     stake: int
     created_at: datetime
     potential_payout: Optional[float] = None
+    buy_price: Optional[float] = None
+    payout: Optional[float] = None
 
     class Config:
         from_attributes = True

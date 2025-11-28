@@ -93,7 +93,9 @@ export default function Dashboard() {
                 <tr>
                   <th>Market</th>
                   <th>Side</th>
-                  <th>Size</th>
+                  <th>Buy Price</th>
+                  <th>Shares</th>
+                  <th>Cost</th>
                   <th>Value</th>
                   <th>Date</th>
                 </tr>
@@ -105,8 +107,18 @@ export default function Dashboard() {
                       <Link to={`/lines/${bet.line_id}`}>View Market</Link>
                     </td>
                     <td className={bet.outcome}>{bet.outcome.toUpperCase()}</td>
+                    <td>
+                      {bet.buy_price ? '$' + bet.buy_price.toFixed(2) : '-'}
+                    </td>
+                    <td>{bet.shares ? bet.shares.toFixed(2) : '-'}</td>
                     <td>{bet.stake}</td>
-                    <td>{bet.potential_payout?.toFixed(0) || 'Resolved'}</td>
+                    <td className={bet.payout !== undefined && bet.payout !== null ? (bet.payout > bet.stake ? 'positive' : 'negative') : ''}>
+                      {bet.payout !== undefined && bet.payout !== null 
+                        ? bet.payout.toFixed(0) 
+                        : bet.shares 
+                          ? `${bet.shares.toFixed(0)}` 
+                          : '-'}
+                    </td>
                     <td>{formatDate(bet.created_at)}</td>
                   </tr>
                 ))}
