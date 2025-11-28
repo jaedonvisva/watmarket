@@ -12,10 +12,10 @@ A university-specific prediction market platform where users bet karma on yes/no
 
 - User registration with Supabase Auth
 - Starting karma balance (1,000)
-- Dynamic odds calculation with Laplace smoothing
-- Place bets on prediction lines
-- Admin resolution with proportional payouts
-- Transaction history
+- **CPMM (Constant Product Market Maker) Trading Model** (Polymarket-style)
+- Buy YES/NO shares with dynamic pricing
+- Admin resolution with share redemption (1 Share = 1 Warrior)
+- Transaction history & Portfolio tracking
 
 ---
 
@@ -26,9 +26,10 @@ A university-specific prediction market platform where users bet karma on yes/no
 | Table | Description |
 |-------|-------------|
 | `users` | User profiles with karma balance |
-| `lines` | Prediction lines (questions) |
-| `bets` | Individual bets placed by users |
-| `transactions` | Karma transaction history |
+| `lines` | Prediction lines with AMM pools (`yes_pool`, `no_pool`) |
+| `bets` | User positions (`shares`, `avg_price`, `outcome`) |
+| `transactions` | Karma ledger (buy, payout, initial) |
+| `price_history` | Historical prices for charting |
 
 ### RLS Policies
 
@@ -38,87 +39,31 @@ A university-specific prediction market platform where users bet karma on yes/no
 
 ---
 
-## Architecture & Implementation
+## Market Mechanics (CPMM)
 
-- **Backend (FastAPI + Supabase)**
-  - FastAPI app exposes REST endpoints under `/users`, `/lines`, and `/bets`.
-  - Supabase Auth handles email/password accounts; a `users` table stores karma balances and `is_admin`.
-  - Business logic is split into routers and services:
-    - `users`: registration, login, current user, and transaction history.
-    - `lines`: CRUD-style operations for prediction lines plus dynamic odds and resolution.
-    - `bets`: placing bets, listing a user’s bets, and per-line positions.
-  - Supabase Postgres tables (`users`, `lines`, `bets`, `transactions`, `price_history`) hold all state, with RLS enforcing per-user access.
+WatMarket uses a **Constant Product Market Maker (CPMM)** model, similar to Polymarket or Uniswap, to price outcome shares.
 
-- **Frontend (React + Vite)**
-  - React SPA with React Router routes for markets list, line detail, portfolio dashboard, auth pages, and admin create line.
-  - `AuthContext` wraps the app, storing the logged-in user and JWT in `localStorage` and attaching it as a Bearer token.
-  - A typed Axios client (`api/client.ts`) talks to the FastAPI API, using `VITE_API_URL` as the base URL.
-  - Pages use this client to fetch lines, bets, transactions, and to place bets or resolve lines.
-
-- **Interaction flow**
-  - Users register/login → receive JWT from backend (Supabase) → frontend stores it.
-  - Authenticated requests hit FastAPI, which uses Supabase admin client to read/write Postgres.
-  - Betting updates `bets`, adjusts `users.karma_balance`, and appends to `transactions`.
-  - Resolving a line computes payouts, updates balances, and writes payout transactions.
-
----
-
-## Frontend UI Overview
-
-The React frontend provides a trading UI on top of the API:
-
-- **Markets (/**)
-  - Lists all prediction lines with status (Active / Resolved / Closed)
-  - Shows YES/NO implied probabilities from the dynamic odds
-  - Filter by open, resolved, or all markets
-
-- **Market Detail (/lines/:id)**
-  - Full question details, volume, closing time, and status
-  - Price history chart for YES/NO over time
-  - Place YES/NO bets with an estimated payout preview
-  - Shows your positions in that market
-  - Admins see controls to resolve the market to YES or NO
-
-- **Create Market (/lines/create, admin only)**
-  - Form for admins to create new prediction lines with title, description, and closing time
-
-- **Portfolio (/dashboard)**
-  - Summary tiles for balance, total bets, and active positions
-  - **Positions** tab: table of all bets, each linking back to its market
-  - **Transactions** tab: table of all karma transactions (bets, payouts, initial grants)
-
-- **Auth (/login, /register)**
-  - Email/password registration and login
-  - Auth state is stored in localStorage and sent as a Bearer token to the API
-
-## Odds Formula
-
-Dynamic odds using Laplace smoothing:
+### Pricing
+The price of an outcome is determined by the ratio of assets in the pool.
+Invariant: `k = yes_pool * no_pool`
 
 ```
-P_yes = (yes_stake + 10) / (yes_stake + no_stake + 20)
-P_no  = (no_stake + 10) / (yes_stake + no_stake + 20)
-
-odds_yes = 1 / P_yes
-odds_no  = 1 / P_no
+Price(YES) = no_pool / (yes_pool + no_pool)
+Price(NO)  = yes_pool / (yes_pool + no_pool)
 ```
+
+### Buying Shares
+When you spend Karma to buy YES shares:
+1.  Your investment effectively adds liquidity to the **NO** pool (pushing the price of NO down and YES up).
+2.  You receive YES shares from the pool based on the curve `x * y = k`.
+3.  **Slippage**: Larger trades move the price more, resulting in a higher average cost per share.
+
+### Payout Logic
+When a market is resolved:
+1.  **Winning Shares** are redeemable for **1.0 Warrior** each.
+2.  **Losing Shares** become worthless (0 payout).
 
 **Example:**
-- yes_stake = 500, no_stake = 300
-- P_yes = 510/820 = 0.622 (62.2%)
-- P_no = 310/820 = 0.378 (37.8%)
-- odds_yes = 1.61x
-- odds_no = 2.64x
-
----
-
-## Payout Logic
-
-When a line is resolved:
-
-1. Identify winning and losing bets
-2. Sum all losing stakes (the "pot")
-3. Distribute pot proportionally to winners based on stake size
-4. Each winner receives: `original_stake + (stake/total_winning_stake) * losing_pot`
-
----
+- You buy 100 YES shares at an average price of 0.60 (Cost: 60 Warriors).
+- **If YES wins**: You receive 100 Warriors. (Profit: +40).
+- **If NO wins**: You receive 0. (Loss: -60).
