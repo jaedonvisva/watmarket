@@ -54,6 +54,7 @@ export interface Line {
   closes_at: string;
   yes_pool: number;
   no_pool: number;
+  volume: number;
   resolved: boolean;
   correct_outcome: 'yes' | 'no' | null;
   created_at: string;
@@ -71,6 +72,10 @@ export interface Bet {
   potential_payout: number | null;
   buy_price?: number;
   payout?: number;
+}
+
+export interface AdminBet extends Bet {
+  user_email: string;
 }
 
 export interface Transaction {
@@ -129,4 +134,6 @@ export const betsApi = {
   getMy: () => api.get<Bet[]>('/bets/my'),
   
   getForLine: (line_id: string) => api.get<Bet[]>(`/bets/line/${line_id}`),
+  
+  getAllForLine: (line_id: string) => api.get<AdminBet[]>(`/bets/line/${line_id}/all`),
 };

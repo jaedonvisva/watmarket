@@ -57,10 +57,12 @@ async def place_bet(
         line["no_pool"]
     )
     
-    # Update pools
+    # Update pools and volume
+    current_volume = line.get("volume", 0) or 0
     admin_client.table("lines").update({
         "yes_pool": new_yes,
-        "no_pool": new_no
+        "no_pool": new_no,
+        "volume": current_volume + bet_data.stake
     }).eq("id", str(bet_data.line_id)).execute()
     
     # Calculate metrics
@@ -153,3 +155,32 @@ async def get_bets_for_line(
     
     # Note: Pydantic will handle optional fields, but old bets might have None shares
     return [BetResponse(**bet) for bet in result.data]
+
+
+@router.get("/line/{line_id}/all", response_model=List[dict])
+async def get_all_bets_for_line(
+    line_id: UUID,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """Get all bets for a specific line (admin only). Includes user email."""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    admin_client = get_supabase_admin()
+    
+    # Get bets with user info
+    result = admin_client.table("bets")\
+        .select("*, users(email)")\
+        .eq("line_id", str(line_id))\
+        .order("created_at", desc=True)\
+        .execute()
+    
+    bets = []
+    for bet in result.data:
+        user_info = bet.pop("users", {}) or {}
+        bets.append({
+            **bet,
+            "user_email": user_info.get("email", "Unknown")
+        })
+    
+    return bets

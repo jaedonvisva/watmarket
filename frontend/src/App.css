@@ -350,7 +350,18 @@ button[type="submit"] {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  margin-top: auto;
+}
+
+.market-footer {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.volume-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 500;
 }
 
 .outcome-row {
@@ -630,6 +641,153 @@ input[type=number] {
 .status-badge.resolved {
   background: rgba(148, 163, 184, 0.15);
   color: var(--text-secondary);
+}
+
+.btn-view {
+  padding: 0.35rem 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-view:hover {
+  background: var(--border);
+}
+
+/* Admin Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 2rem;
+}
+
+.modal-content {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  padding: 2rem;
+  max-width: 700px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  line-height: 1;
+  padding: 0.25rem;
+}
+
+.modal-close:hover {
+  color: var(--text-primary);
+}
+
+.admin-modal h2 {
+  margin: 0 0 0.5rem 0;
+  padding-right: 2rem;
+}
+
+.admin-detail-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: var(--bg-main);
+  border-radius: 0.5rem;
+}
+
+@media (max-width: 500px) {
+  .admin-detail-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.detail-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detail-stat .label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.detail-stat .value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.detail-stat .value.yes {
+  color: var(--green);
+}
+
+.detail-stat .value.no {
+  color: var(--red);
+}
+
+.admin-resolve-section {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: var(--bg-main);
+  border-radius: 0.5rem;
+}
+
+.admin-resolve-section h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
+}
+
+.admin-resolve-section.resolved {
+  border-left: 3px solid var(--text-secondary);
+}
+
+.admin-resolve-section strong.yes {
+  color: var(--green);
+}
+
+.admin-resolve-section strong.no {
+  color: var(--red);
+}
+
+.admin-positions-section {
+  margin-top: 1.5rem;
+}
+
+.admin-positions-section h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+}
+
+.data-table td.yes {
+  color: var(--green);
+}
+
+.data-table td.no {
+  color: var(--red);
 }
 
 /* Dashboard Stats */

@@ -149,7 +149,7 @@ export default function LineDetail() {
       <div className="market-title-section">
         <h1>{line.title}</h1>
         <div className="market-stats">
-          <span>Liquidity: {(line.yes_pool + line.no_pool).toFixed(0)}</span>
+          <span>Volume: ${(line.volume || 0).toLocaleString()}</span>
           <span>Ends: {formatDate(line.closes_at)}</span>
           <span className={`status-badge ${line.resolved ? 'resolved' : isOpen ? 'open' : 'closed'}`}>
             {line.resolved ? 'Resolved' : isOpen ? 'Trading Open' : 'Trading Closed'}

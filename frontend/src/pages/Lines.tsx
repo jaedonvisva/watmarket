@@ -102,6 +102,10 @@ export default function Lines() {
                   <span className="outcome-value">{(line.odds.no_probability * 100).toFixed(0)}%</span>
                 </div>
               </div>
+
+              <div className="market-footer">
+                <span className="volume-label">${(line.volume || 0).toLocaleString()} Vol</span>
+              </div>
             </Link>
           ))}
         </div>

@@ -24,6 +24,7 @@ def _enrich_line_with_odds(line_data: dict) -> LineResponse:
         closes_at=line_data["closes_at"],
         yes_pool=line_data["yes_pool"],
         no_pool=line_data["no_pool"],
+        volume=line_data.get("volume", 0) or 0,
         resolved=line_data["resolved"],
         correct_outcome=line_data["correct_outcome"],
         created_at=line_data["created_at"],

@@ -60,6 +60,7 @@ class LineResponse(BaseModel):
     closes_at: datetime
     yes_pool: float
     no_pool: float
+    volume: float = 0
     resolved: bool
     correct_outcome: Optional[Literal["yes", "no"]]
     created_at: datetime
