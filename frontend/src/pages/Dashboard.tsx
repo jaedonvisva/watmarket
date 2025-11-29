@@ -1,38 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { Bet, Transaction } from '../api/client';
+import { useQuery } from '@tanstack/react-query';
 import { betsApi, authApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
 
 export default function Dashboard() {
-  const { user, refreshUser } = useAuth();
-  const [bets, setBets] = useState<Bet[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'bets' | 'transactions'>('bets');
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const { data: bets = [], isLoading: loadingBets } = useQuery({
+    queryKey: ['my-bets'],
+    queryFn: async () => (await betsApi.getMy()).data,
+    enabled: !!user,
+  });
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [betsRes, transRes] = await Promise.all([
-        betsApi.getMy(),
-        authApi.getTransactions(),
-      ]);
-      setBets(betsRes.data);
-      setTransactions(transRes.data);
-      await refreshUser();
-    } catch {
-      console.error('Failed to load dashboard data');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: transactions = [], isLoading: loadingTx } = useQuery({
+    queryKey: ['my-transactions'],
+    queryFn: async () => (await authApi.getTransactions()).data,
+    enabled: !!user,
+  });
+
+  const loading = activeTab === 'bets' ? loadingBets : loadingTx;
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', {

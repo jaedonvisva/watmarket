@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import type { Line } from '../api/client';
 import { linesApi } from '../api/client';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
 
 export default function Lines() {
-  const [lines, setLines] = useState<Line[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [filter, setFilter] = useState<'all' | 'open' | 'resolved'>('open');
   const [now, setNow] = useState(new Date());
 
@@ -17,22 +15,13 @@ export default function Lines() {
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    fetchLines();
-  }, [filter]);
-
-  const fetchLines = async () => {
-    setLoading(true);
-    try {
+  const { data: lines = [], isLoading: loading, error } = useQuery({
+    queryKey: ['lines', filter],
+    queryFn: async () => {
       const resolved = filter === 'all' ? undefined : filter === 'resolved';
-      const response = await linesApi.getAll(resolved);
-      setLines(response.data);
-    } catch {
-      setError('Failed to load lines');
-    } finally {
-      setLoading(false);
+      return (await linesApi.getAll(resolved)).data;
     }
-  };
+  });
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', {
@@ -79,7 +68,7 @@ export default function Lines() {
         </div>
       </div>
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error">Failed to load markets</div>}
 
       {loading ? (
         <LoadingSpinner />
