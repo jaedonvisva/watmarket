@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import type { Line } from '../api/client';
 import { linesApi } from '../api/client';
+import LoadingSpinner from '../components/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
 
 export default function Lines() {
   const [lines, setLines] = useState<Line[]>([]);
@@ -43,6 +45,14 @@ export default function Lines() {
     return !line.resolved && new Date(line.closes_at) > now;
   };
 
+  const getEmptyMessage = () => {
+    switch (filter) {
+      case 'open': return 'There are no active prediction markets at the moment.';
+      case 'resolved': return 'There are no resolved markets yet.';
+      default: return 'No markets found matching your criteria.';
+    }
+  };
+
   return (
     <div className="lines-page">
       <div className="page-header">
@@ -72,9 +82,13 @@ export default function Lines() {
       {error && <div className="error">{error}</div>}
 
       {loading ? (
-        <div className="loading">Loading markets...</div>
+        <LoadingSpinner />
       ) : lines.length === 0 ? (
-        <div className="empty">No markets found</div>
+        <EmptyState 
+          title="No markets found"
+          description={getEmptyMessage()}
+          icon="📉"
+        />
       ) : (
         <div className="lines-grid">
           {lines.map((line) => (

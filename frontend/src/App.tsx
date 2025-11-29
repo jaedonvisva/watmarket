@@ -12,6 +12,7 @@ import Lines from './pages/Lines';
 import LineDetail from './pages/LineDetail';
 import CreateLine from './pages/CreateLine';
 import Dashboard from './pages/Dashboard';
+import LoadingSpinner from './components/LoadingSpinner';
 import './App.css';
 
 const queryClient = new QueryClient();
@@ -105,7 +106,7 @@ function Sidebar() {
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   
-  if (isLoading) return <div className="loading-screen">Loading...</div>;
+  if (isLoading) return <LoadingSpinner fullScreen />;
   if (!user) return <Navigate to="/login" />;
   
   return (

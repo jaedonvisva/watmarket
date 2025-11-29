@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import type { Bet, Transaction } from '../api/client';
 import { betsApi, authApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import LoadingSpinner from '../components/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
 
 export default function Dashboard() {
   const { user, refreshUser } = useAuth();
@@ -80,13 +82,16 @@ export default function Dashboard() {
       </div>
 
       {loading ? (
-        <div className="loading">Loading portfolio...</div>
+        <LoadingSpinner />
       ) : activeTab === 'bets' ? (
         <div className="bets-list">
           {bets.length === 0 ? (
-            <div className="empty">
-              No positions yet. <Link to="/">Browse markets</Link> to trade!
-            </div>
+            <EmptyState 
+              title="No positions yet"
+              description="You haven't placed any bets. Browse markets to start trading!"
+              icon="💼"
+              action={<Link to="/" className="btn btn-primary" style={{display: 'inline-block', padding: '0.5rem 1rem', background: 'var(--gold)', color: '#000', borderRadius: '0.5rem', textDecoration: 'none', fontWeight: 'bold'}}>Browse Markets</Link>}
+            />
           ) : (
             <table className="data-table">
               <thead>
@@ -129,7 +134,11 @@ export default function Dashboard() {
       ) : (
         <div className="transactions-list">
           {transactions.length === 0 ? (
-            <div className="empty">No transactions found.</div>
+            <EmptyState 
+              title="No transactions found"
+              description="Your transaction history is empty."
+              icon="📝"
+            />
           ) : (
             <table className="data-table">
               <thead>

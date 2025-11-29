@@ -4,6 +4,7 @@ import type { Line, Bet, PriceHistoryPoint } from '../api/client';
 import { linesApi, betsApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import PriceChart from '../components/PriceChart';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 export default function LineDetail() {
   const { id } = useParams<{ id: string }>();
@@ -154,7 +155,7 @@ export default function LineDetail() {
 
   const estPrice = estShares > 0 ? estCost / estShares : 0;
 
-  if (loading) return <div className="loading">Loading market data...</div>;
+  if (loading) return <LoadingSpinner />;
   if (!line) return <div className="error">Market not found</div>;
 
   return (
@@ -187,75 +188,95 @@ export default function LineDetail() {
       
       {error && <div className="error">{error}</div>}
 
-      <div className="trading-section">
-        {/* Order Book / Price Display */}
-        <div 
-          className={`order-book-card yes ${outcome === 'yes' ? 'selected' : ''}`}
-          onClick={() => isOpen && setOutcome('yes')}
-        >
-          <h3>Buy Yes</h3>
-          <div className="big-percentage">{(line.odds.yes_probability * 100).toFixed(0)}%</div>
-          <div className="price-info">Price: ${line.odds.yes_probability.toFixed(2)}</div>
+      <div className="trading-panel">
+        <div className="outcome-selector">
+          <button 
+            className={`outcome-btn ${outcome === 'yes' ? 'selected yes' : ''}`}
+            onClick={() => isOpen && setOutcome('yes')}
+          >
+            <div style={{fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '0.25rem'}}>Yes</div>
+            <div style={{fontSize: '1.5rem', fontWeight: 800}}>{(line.odds.yes_probability * 100).toFixed(0)}%</div>
+            <div style={{fontSize: '0.8rem', opacity: 0.7}}>${line.odds.yes_probability.toFixed(2)}</div>
+          </button>
+          <button 
+            className={`outcome-btn ${outcome === 'no' ? 'selected no' : ''}`}
+            onClick={() => isOpen && setOutcome('no')}
+          >
+            <div style={{fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '0.25rem'}}>No</div>
+            <div style={{fontSize: '1.5rem', fontWeight: 800}}>{(line.odds.no_probability * 100).toFixed(0)}%</div>
+            <div style={{fontSize: '0.8rem', opacity: 0.7}}>${line.odds.no_probability.toFixed(2)}</div>
+          </button>
         </div>
 
-        <div 
-          className={`order-book-card no ${outcome === 'no' ? 'selected' : ''}`}
-          onClick={() => isOpen && setOutcome('no')}
-        >
-          <h3>Buy No</h3>
-          <div className="big-percentage">{(line.odds.no_probability * 100).toFixed(0)}%</div>
-          <div className="price-info">Price: ${line.odds.no_probability.toFixed(2)}</div>
-        </div>
-      </div>
+        {isOpen && user ? (
+          <>
+            <div className="input-tabs">
+              <button 
+                className={`tab-btn ${buyMode === 'amount' ? 'active' : ''}`}
+                onClick={() => setBuyMode('amount')}
+              >
+                Buy in Dollars
+              </button>
+              <button 
+                className={`tab-btn ${buyMode === 'shares' ? 'active' : ''}`}
+                onClick={() => setBuyMode('shares')}
+              >
+                Buy in Shares
+              </button>
+            </div>
 
-      {isOpen && user && (
-        <div className="order-form">
-          <h3>New Order: Buy {outcome.toUpperCase()}</h3>
-          
-          <div className="mode-toggle" style={{marginBottom: '1rem'}}>
-            <label style={{marginRight: '1rem'}}>
-              <input 
-                type="radio" 
-                checked={buyMode === 'amount'} 
-                onChange={() => setBuyMode('amount')}
-              /> By Amount (Cost)
-            </label>
-            <label>
-              <input 
-                type="radio" 
-                checked={buyMode === 'shares'} 
-                onChange={() => setBuyMode('shares')}
-              /> By Shares
-            </label>
+            <form onSubmit={handlePlaceBet}>
+              <div className="trade-input-container">
+                {buyMode === 'amount' && <div className="currency-prefix">$</div>}
+                <input
+                  className="huge-input"
+                  type="number"
+                  min={1}
+                  max={buyMode === 'amount' ? user.karma_balance : undefined}
+                  value={buyMode === 'amount' ? stake : targetShares}
+                  onChange={(e) => buyMode === 'amount' ? setStake(Number(e.target.value)) : setTargetShares(Number(e.target.value))}
+                  placeholder="0"
+                />
+              </div>
+
+              <div className="order-summary-card">
+                 <div className="summary-row">
+                   <span className="summary-label">Avg Price</span>
+                   <span className="summary-val">${estPrice.toFixed(2)}</span>
+                 </div>
+                 <div className="summary-row">
+                   <span className="summary-label">Est Shares</span>
+                   <span className="summary-val">{estShares.toFixed(2)}</span>
+                 </div>
+                 <div className="summary-row">
+                   <span className="summary-label">Potential Return</span>
+                   <span className="summary-val">${estShares.toFixed(0)} ({estCost > 0 ? ((estShares / estCost - 1) * 100).toFixed(0) : 0}%)</span>
+                 </div>
+                 <div className="summary-row">
+                   <span className="summary-label">Total Cost</span>
+                   <span className="summary-val">${estCost.toFixed(2)}</span>
+                 </div>
+              </div>
+
+              <button 
+                type="submit" 
+                disabled={betting || (buyMode === 'amount' ? stake > user.karma_balance : estCost > user.karma_balance) || estCost <= 0}
+                className={`action-btn ${outcome}`}
+              >
+                {betting ? 'Processing...' : 'Submit Order'}
+              </button>
+              
+              <div className="balance-hint">
+                Available Balance: ${user.karma_balance.toLocaleString()}
+              </div>
+            </form>
+          </>
+        ) : (
+          <div style={{textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem'}}>
+            {!user ? 'Log in to trade' : 'Trading is closed'}
           </div>
-
-          <form onSubmit={handlePlaceBet}>
-            <div className="input-group">
-              <label>{buyMode === 'amount' ? 'Amount (WARRIORS)' : 'Target Shares'}</label>
-              <input
-                type="number"
-                min={1}
-                max={buyMode === 'amount' ? user.karma_balance : undefined}
-                value={buyMode === 'amount' ? stake : targetShares}
-                onChange={(e) => buyMode === 'amount' ? setStake(Number(e.target.value)) : setTargetShares(Number(e.target.value))}
-              />
-            </div>
-            <div className="order-summary">
-               <p>Est. Shares: <strong>{estShares.toFixed(2)}</strong></p>
-               <p>Cost: <strong>{estCost.toFixed(2)}</strong></p>
-               <p>Avg Price: <strong>${estPrice.toFixed(2)}</strong></p>
-               <p className="balance">Available: {user.karma_balance}</p>
-            </div>
-            <button 
-              type="submit" 
-              disabled={betting}
-              className={`buy-btn ${outcome}`}
-            >
-              {betting ? 'Processing...' : `Place Buy Order`}
-            </button>
-          </form>
-        </div>
-      )}
+        )}
+      </div>
 
       {user?.is_admin && !line.resolved && (
         <div className="admin-section" style={{marginTop: '3rem'}}>
