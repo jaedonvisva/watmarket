@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import type { Line } from '../api/client';
 import { linesApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import LoadingSpinner from '../components/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -120,9 +122,12 @@ export default function Admin() {
       {error && <div className="error">{error}</div>}
 
       {loading ? (
-        <div className="loading">Loading markets...</div>
+        <LoadingSpinner />
       ) : filteredLines.length === 0 ? (
-        <div className="empty">No markets found</div>
+        <EmptyState 
+          title={filter === 'all' ? 'No markets yet' : `No ${filter} markets`}
+          description={filter === 'closed' ? 'Markets pending resolution will appear here' : 'Markets will appear here once created'}
+        />
       ) : (
         <table className="data-table">
           <thead>
@@ -153,7 +158,7 @@ export default function Admin() {
                     </span>
                   </td>
                   <td>{(line.odds.yes_probability * 100).toFixed(0)}%</td>
-                  <td>{line.yes_stake + line.no_stake}</td>
+                  <td>{line.yes_pool + line.no_pool}</td>
                   <td>{formatDate(line.closes_at)}</td>
                   <td>
                     {status === 'closed' && (

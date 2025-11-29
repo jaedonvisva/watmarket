@@ -12,6 +12,7 @@ import Lines from './pages/Lines';
 import LineDetail from './pages/LineDetail';
 import CreateLine from './pages/CreateLine';
 import Dashboard from './pages/Dashboard';
+import Admin from './pages/Admin';
 import LoadingSpinner from './components/LoadingSpinner';
 import './App.css';
 
@@ -62,9 +63,14 @@ function Sidebar() {
           <span className="icon">👤</span> Portfolio
         </Link>
         {user.is_admin && (
-          <Link to="/lines/create" className={`nav-item ${isActive('/lines/create')}`}>
-            <span className="icon">⚡</span> Create Market
-          </Link>
+          <>
+            <Link to="/admin" className={`nav-item ${isActive('/admin')}`}>
+              <span className="icon">🛠️</span> Admin
+            </Link>
+            <Link to="/lines/create" className={`nav-item ${isActive('/lines/create')}`}>
+              <span className="icon">⚡</span> Create Market
+            </Link>
+          </>
         )}
       </div>
 
@@ -130,6 +136,7 @@ function AppRoutes() {
         <Route path="/lines/:id" element={<Layout><LineDetail /></Layout>} />
         <Route path="/lines/create" element={<Layout><CreateLine /></Layout>} />
         <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
+        <Route path="/admin" element={<Layout><Admin /></Layout>} />
       </Routes>
     </BrowserRouter>
   );

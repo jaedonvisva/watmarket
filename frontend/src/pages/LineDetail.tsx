@@ -25,9 +25,6 @@ export default function LineDetail() {
   const [buyMode, setBuyMode] = useState<'amount' | 'shares'>('amount');
   const [betting, setBetting] = useState(false);
 
-  // Resolve form (admin)
-  const [resolving, setResolving] = useState(false);
-
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
@@ -80,21 +77,6 @@ export default function LineDetail() {
       setError(errorMessage);
     } finally {
       setBetting(false);
-    }
-  };
-
-  const handleResolve = async (correctOutcome: 'yes' | 'no') => {
-    if (!line) return;
-    if (!confirm(`Confirm resolution: ${correctOutcome.toUpperCase()}?`)) return;
-
-    setResolving(true);
-    try {
-      await linesApi.resolve(line.id, correctOutcome);
-      await fetchData();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Resolution failed');
-    } finally {
-      setResolving(false);
     }
   };
 
@@ -277,20 +259,6 @@ export default function LineDetail() {
           </div>
         )}
       </div>
-
-      {user?.is_admin && !line.resolved && (
-        <div className="admin-section" style={{marginTop: '3rem'}}>
-          <h3>Admin Controls</h3>
-          <div className="resolve-buttons">
-            <button className="btn btn-yes" onClick={() => handleResolve('yes')} disabled={resolving}>
-              Resolve Yes
-            </button>
-            <button className="btn btn-no" onClick={() => handleResolve('no')} disabled={resolving}>
-              Resolve No
-            </button>
-          </div>
-        </div>
-      )}
 
       {myBets.length > 0 && (
         <div style={{ marginTop: '3rem' }}>

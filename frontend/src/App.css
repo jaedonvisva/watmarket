@@ -539,6 +539,99 @@ input[type=number] {
 .buy-btn.yes { background: var(--green); color: #000; }
 .buy-btn.no { background: var(--text-secondary); color: #000; }
 
+/* Admin Page */
+.admin-page {
+  max-width: 1200px;
+}
+
+.admin-page .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.admin-page .page-header h1 {
+  margin: 0;
+}
+
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 900px) {
+  .admin-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 500px) {
+  .admin-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+.resolve-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-resolve {
+  padding: 0.35rem 0.75rem;
+  border: none;
+  border-radius: 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn-resolve:hover {
+  opacity: 0.85;
+}
+
+.btn-resolve:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-resolve.yes {
+  background: var(--green);
+  color: #000;
+}
+
+.btn-resolve.no {
+  background: var(--red);
+  color: #fff;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-badge.open {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--green);
+}
+
+.status-badge.closed {
+  background: rgba(251, 191, 36, 0.15);
+  color: var(--gold);
+}
+
+.status-badge.resolved {
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--text-secondary);
+}
+
 /* Dashboard Stats */
 .dashboard-grid {
   display: grid;
