@@ -50,25 +50,28 @@ function Sidebar() {
             src={theme === 'dark' ? logoDark : logoLight} 
             alt="WatMarket" 
             className="brand-logo" 
-            style={{ height: '48px', objectFit: 'contain' }}
           />
         </Link>
       </div>
 
       <div className="sidebar-nav">
         <Link to="/" className={`nav-item ${isActive('/')}`}>
-          <span className="icon">📈</span> Markets
+          <span className="icon">📈</span>
+          <span className="nav-label">Markets</span>
         </Link>
         <Link to="/dashboard" className={`nav-item ${isActive('/dashboard')}`}>
-          <span className="icon">👤</span> Portfolio
+          <span className="icon">👤</span>
+          <span className="nav-label">Portfolio</span>
         </Link>
         {user.is_admin && (
           <>
             <Link to="/admin" className={`nav-item ${isActive('/admin')}`}>
-              <span className="icon">🛠️</span> Admin
+              <span className="icon">🛠️</span>
+              <span className="nav-label">Admin</span>
             </Link>
             <Link to="/lines/create" className={`nav-item ${isActive('/lines/create')}`}>
-              <span className="icon">⚡</span> Create Market
+              <span className="icon">⚡</span>
+              <span className="nav-label">Create Market</span>
             </Link>
           </>
         )}
@@ -78,32 +81,23 @@ function Sidebar() {
         <button 
           onClick={toggleTheme} 
           className="theme-toggle-btn"
-          style={{ 
-            marginBottom: '1rem',
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem',
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border)',
-            color: 'var(--text-secondary)',
-            padding: '0.5rem',
-            borderRadius: '0.25rem',
-            cursor: 'pointer'
-          }}
         >
           {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-          <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+          <span className="nav-label">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
         </button>
 
-        <Clock />
-        <div className="user-balance">
-          <span className="label">GOOS</span>
-          <span className="currency">GOOS</span>
-          <span className="amount">{user.karma_balance.toLocaleString()}</span>
+        <div className="sidebar-footer-content">
+          <Clock />
+          <div className="user-balance">
+            <span className="label">GOOS</span>
+            <span className="currency">GOOS</span>
+            <span className="amount">{user.karma_balance.toLocaleString()}</span>
+          </div>
+          <button onClick={logout} className="logout-btn">
+            <span className="nav-label">Sign Out</span>
+            <span className="icon-only">🚪</span>
+          </button>
         </div>
-        <button onClick={logout} className="logout-btn">Sign Out</button>
       </div>
     </aside>
   );
