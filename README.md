@@ -67,3 +67,28 @@ When a market is resolved:
 - You buy 100 YES shares at an average price of 0.60 (Cost: 60 GOOS).
 - **If YES wins**: You receive 100 GOOS. (Profit: +40).
 - **If NO wins**: You receive 0. (Loss: -60).
+
+---
+
+## 🔬 Security & Performance Audit
+
+A comprehensive deep health check was performed on November 30, 2025. See **[AUDIT_REPORT.md](./AUDIT_REPORT.md)** for full details.
+
+### Quick Summary
+
+**Overall Health:** 7.5/10 🟡
+
+**Critical Issues Found:**
+- 🔴 Race conditions in bet placement (no transaction atomicity)
+- 🔴 Float precision errors in financial calculations
+- 🔴 Missing constraints on negative balances and zero pools
+- 🔴 Payout rounding causes monetary loss
+- 🔴 Security vulnerability in database function
+
+**Status:** Ready for development, requires fixes before production deployment.
+
+See the audit report for:
+- 26 detailed findings (6 critical, 12 warnings, 8 optimizations)
+- Complete migration scripts
+- Testing checklist
+- Priority roadmap
