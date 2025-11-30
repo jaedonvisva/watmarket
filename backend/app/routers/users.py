@@ -3,7 +3,7 @@ from typing import List
 
 from app.database import get_supabase_client, get_supabase_admin
 from app.models.schemas import (
-    UserCreate, UserLogin, UserResponse, AuthResponse, TransactionResponse
+    UserCreate, UserLogin, UserResponse, AuthResponse, TradeHistoryItem
 )
 from app.services.auth import get_current_user
 
@@ -90,15 +90,50 @@ async def get_me(current_user: UserResponse = Depends(get_current_user)):
     return current_user
 
 
-@router.get("/me/transactions", response_model=List[TransactionResponse])
-async def get_my_transactions(current_user: UserResponse = Depends(get_current_user)):
-    """Get current user's transaction history."""
+@router.get("/me/trades", response_model=List[TradeHistoryItem])
+async def get_my_trades(current_user: UserResponse = Depends(get_current_user)):
+    """Get current user's trade history - one row per bet with payout info."""
     admin_client = get_supabase_admin()
     
-    result = admin_client.table("transactions")\
-        .select("*")\
+    # Get all bets with line data
+    bets_result = admin_client.table("bets")\
+        .select("*, lines(id, title, resolved, correct_outcome)")\
         .eq("user_id", str(current_user.id))\
         .order("created_at", desc=True)\
         .execute()
     
-    return [TransactionResponse(**t) for t in result.data]
+    trades = []
+    for bet in bets_result.data:
+        line = bet.get("lines", {}) or {}
+        if not line:
+            continue
+        
+        is_resolved = line.get("resolved", False)
+        correct_outcome = line.get("correct_outcome")
+        
+        # Determine result and payout
+        result = None
+        payout = None
+        if is_resolved and correct_outcome:
+            if bet["outcome"] == correct_outcome:
+                result = "won"
+                payout = bet.get("payout") or bet.get("shares") or 0
+            else:
+                result = "lost"
+                payout = 0
+        
+        trades.append(TradeHistoryItem(
+            id=bet["id"],
+            created_at=bet["created_at"],
+            line_id=bet["line_id"],
+            line_title=line.get("title", "Unknown"),
+            outcome=bet["outcome"],
+            shares=bet.get("shares") or 0,
+            buy_price=bet.get("buy_price") or 0,
+            cost=bet["stake"],
+            is_resolved=is_resolved,
+            result=result,
+            payout=payout
+        ))
+    
+    return trades

@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { betsApi, authApi } from '../api/client';
+import type { Trade } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'bets' | 'transactions'>('bets');
+  const [activeTab, setActiveTab] = useState<'bets' | 'trades'>('bets');
 
   const { data: bets = [], isLoading: loadingBets } = useQuery({
     queryKey: ['my-bets'],
@@ -16,13 +17,13 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
-  const { data: transactions = [], isLoading: loadingTx } = useQuery({
-    queryKey: ['my-transactions'],
-    queryFn: async () => (await authApi.getTransactions()).data,
+  const { data: trades = [], isLoading: loadingTrades } = useQuery({
+    queryKey: ['my-trades'],
+    queryFn: async () => (await authApi.getTrades()).data,
     enabled: !!user,
   });
 
-  const loading = activeTab === 'bets' ? loadingBets : loadingTx;
+  const loading = activeTab === 'bets' ? loadingBets : loadingTrades;
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', {
@@ -64,10 +65,10 @@ export default function Dashboard() {
           Positions
         </button>
         <button
-          className={activeTab === 'transactions' ? 'active' : ''}
-          onClick={() => setActiveTab('transactions')}
+          className={activeTab === 'trades' ? 'active' : ''}
+          onClick={() => setActiveTab('trades')}
         >
-          Transactions
+          Trade History
         </button>
       </div>
 
@@ -122,30 +123,38 @@ export default function Dashboard() {
           )}
         </div>
       ) : (
-        <div className="transactions-list">
-          {transactions.length === 0 ? (
+        <div className="trades-list">
+          {trades.length === 0 ? (
             <EmptyState 
-              title="No transactions found"
-              description="Your transaction history is empty."
+              title="No trades found"
+              description="Your trade history is empty."
               icon="📝"
             />
           ) : (
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Type</th>
-                  <th>Amount</th>
+                  <th>Market</th>
+                  <th>Side</th>
+                  <th>Cost</th>
+                  <th>Result</th>
                   <th>Date</th>
                 </tr>
               </thead>
               <tbody>
-                {transactions.map((tx) => (
-                  <tr key={tx.id}>
-                    <td style={{ textTransform: 'capitalize' }}>{tx.type}</td>
-                    <td className={tx.amount >= 0 ? 'positive' : 'negative'}>
-                      {tx.amount >= 0 ? '+' : ''}{tx.amount}
+                {trades.map((trade: Trade) => (
+                  <tr key={trade.id}>
+                    <td>
+                      <Link to={`/lines/${trade.line_id}`}>{trade.line_title}</Link>
                     </td>
-                    <td>{formatDate(tx.created_at)}</td>
+                    <td className={trade.outcome}>{trade.outcome.toUpperCase()}</td>
+                    <td>{trade.cost}</td>
+                    <td>
+                      {trade.result 
+                        ? (trade.result === 'won' ? `Won (+${trade.payout?.toFixed(0) || 0})` : 'Lost (0)')
+                        : 'Open'}
+                    </td>
+                    <td>{formatDate(trade.created_at)}</td>
                   </tr>
                 ))}
               </tbody>

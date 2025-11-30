@@ -1700,19 +1700,24 @@ input[type=number] {
   color: var(--gold);
 }
 
-.history-table th:nth-child(1),
-.history-table td:nth-child(1) {
-  width: 20%;
+.text-muted {
+  color: var(--text-muted);
 }
 
-.history-table th:nth-child(2),
-.history-table td:nth-child(2) {
-  width: 30%;
+/* Result badges for history */
+.result-badge.won {
+  background: var(--green-dim);
+  color: var(--green);
 }
 
-.history-table th:nth-child(3),
-.history-table td:nth-child(3) {
-  width: 50%;
+.result-badge.lost {
+  background: rgba(255, 77, 77, 0.1);
+  color: var(--red);
+}
+
+.result-badge.pending {
+  background: var(--gold-dim);
+  color: var(--gold);
 }
 
 .amount-wrapper {
@@ -1734,6 +1739,11 @@ input[type=number] {
 .date-cell {
   color: var(--text-secondary);
   font-size: 0.85rem;
+}
+
+.cost-cell {
+  font-family: 'SF Mono', 'Monaco', monospace;
+  font-size: 0.9rem;
 }
 
 /* Empty State Button */

@@ -78,13 +78,18 @@ export interface AdminBet extends Bet {
   user_email: string;
 }
 
-export interface Transaction {
+export interface Trade {
   id: string;
-  user_id: string;
-  amount: number;
-  type: 'bet' | 'payout' | 'initial';
-  reference_id: string | null;
   created_at: string;
+  line_id: string;
+  line_title: string;
+  outcome: 'yes' | 'no';
+  shares: number;
+  buy_price: number;
+  cost: number;
+  is_resolved: boolean;
+  result: 'won' | 'lost' | null;
+  payout: number | null;
 }
 
 export interface Position {
@@ -137,7 +142,7 @@ export const authApi = {
   
   getMe: () => api.get<User>('/users/me'),
   
-  getTransactions: () => api.get<Transaction[]>('/users/me/transactions'),
+  getTrades: () => api.get<Trade[]>('/users/me/trades'),
 };
 
 export const linesApi = {

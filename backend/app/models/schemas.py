@@ -145,6 +145,25 @@ class TransactionResponse(BaseModel):
         from_attributes = True
 
 
+class TradeHistoryItem(BaseModel):
+    """A single trade (bet) with full details including payout if resolved."""
+    id: UUID  # bet id
+    created_at: datetime
+    line_id: UUID
+    line_title: str
+    outcome: Literal["yes", "no"]
+    shares: float
+    buy_price: float
+    cost: int  # stake (always positive)
+    # Resolution info
+    is_resolved: bool
+    result: Optional[Literal["won", "lost"]] = None
+    payout: Optional[float] = None  # Amount received if resolved
+
+    class Config:
+        from_attributes = True
+
+
 # ============ Auth Schemas ============
 
 class AuthResponse(BaseModel):
