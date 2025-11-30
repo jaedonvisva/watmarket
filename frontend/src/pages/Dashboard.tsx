@@ -43,8 +43,8 @@ export default function Dashboard() {
 
       <div className="dashboard-grid">
         <div className="stat-tile">
-          <h4>Balance</h4>
-          <div className="val">{user.karma_balance.toLocaleString()} <span style={{fontSize: '0.5em', opacity: 0.7}}>GOOSE</span></div>
+          <h4>GOOS Balance</h4>
+          <div className="val"><span style={{fontSize: '0.5em', opacity: 0.7}}>GOOS</span> {user.karma_balance.toLocaleString()}</div>
         </div>
         <div className="stat-tile">
           <h4>Total Bets</h4>
@@ -103,7 +103,7 @@ export default function Dashboard() {
                     </td>
                     <td className={bet.outcome}>{bet.outcome.toUpperCase()}</td>
                     <td>
-                      {bet.buy_price ? '$' + bet.buy_price.toFixed(2) : '-'}
+                      {bet.buy_price ? bet.buy_price.toFixed(2) : '-'}
                     </td>
                     <td>{bet.shares ? bet.shares.toFixed(2) : '-'}</td>
                     <td>{bet.stake}</td>

@@ -1,6 +1,6 @@
 # WatMarket - University Prediction Market
 
-A university-specific prediction market platform where users bet GOOSE tokens on yes/no outcomes.
+A university-specific prediction market platform where users trade GOOS (virtual points) on yes/no outcomes.
 
 ## Stack
 
@@ -11,10 +11,10 @@ A university-specific prediction market platform where users bet GOOSE tokens on
 ## Features
 
 - User registration with Supabase Auth
-- Starting GOOSE balance (1,000)
+- Starting GOOS balance (1,000)
 - **CPMM (Constant Product Market Maker) Trading Model** (Polymarket-style)
 - Buy YES/NO shares with dynamic pricing
-- Admin resolution with share redemption (1 Share = 1 GOOSE)
+- Admin resolution with share redemption (1 Share = 1 GOOS)
 - Transaction history & Portfolio tracking
 
 ---
@@ -25,10 +25,10 @@ A university-specific prediction market platform where users bet GOOSE tokens on
 
 | Table | Description |
 |-------|-------------|
-| `users` | User profiles with GOOSE balance |
+| `users` | User profiles with GOOS balance |
 | `lines` | Prediction lines with AMM pools (`yes_pool`, `no_pool`) |
 | `bets` | User positions (`shares`, `avg_price`, `outcome`) |
-| `transactions` | GOOSE ledger (buy, payout, initial) |
+| `transactions` | GOOS ledger (buy, payout, initial) |
 | `price_history` | Historical prices for charting |
 
 ### RLS Policies
@@ -53,17 +53,17 @@ Price(NO)  = yes_pool / (yes_pool + no_pool)
 ```
 
 ### Buying Shares
-When you spend GOOSE to buy YES shares:
+When you spend GOOS to buy YES shares:
 1.  Your investment effectively adds liquidity to the **NO** pool (pushing the price of NO down and YES up).
 2.  You receive YES shares from the pool based on the curve `x * y = k`.
 3.  **Slippage**: Larger trades move the price more, resulting in a higher average cost per share.
 
 ### Payout Logic
 When a market is resolved:
-1.  **Winning Shares** are redeemable for **1.0 GOOSE** each.
+1.  **Winning Shares** are redeemable for **1.0 GOOS** each.
 2.  **Losing Shares** become worthless (0 payout).
 
 **Example:**
-- You buy 100 YES shares at an average price of 0.60 (Cost: 60 GOOSE).
-- **If YES wins**: You receive 100 GOOSE. (Profit: +40).
+- You buy 100 YES shares at an average price of 0.60 (Cost: 60 GOOS).
+- **If YES wins**: You receive 100 GOOS. (Profit: +40).
 - **If NO wins**: You receive 0. (Loss: -60).

@@ -4,9 +4,9 @@ from uuid import UUID
 from datetime import datetime, timezone
 
 from app.database import get_supabase_admin
-from app.models.schemas import BetCreate, BetResponse, UserResponse
+from app.models.schemas import BetCreate, BetResponse, UserResponse, PositionResponse, PortfolioSummary
 from app.services.auth import get_current_user
-from app.services.odds import calculate_cpmm_buy
+from app.services.odds import calculate_cpmm_buy, calculate_odds
 
 router = APIRouter(prefix="/bets", tags=["bets"])
 
@@ -184,3 +184,181 @@ async def get_all_bets_for_line(
         })
     
     return bets
+
+
+@router.get("/positions", response_model=List[PositionResponse])
+async def get_positions(
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """
+    Get aggregated positions for the current user.
+    Groups bets by (line_id, outcome) and calculates current value based on market prices.
+    """
+    admin_client = get_supabase_admin()
+    
+    # Get all bets with line data
+    result = admin_client.table("bets")\
+        .select("*, lines(*)")\
+        .eq("user_id", str(current_user.id))\
+        .execute()
+    
+    # Aggregate by (line_id, outcome)
+    positions_map = {}
+    
+    for bet in result.data:
+        line = bet.get("lines", {})
+        if not line:
+            continue
+            
+        key = (bet["line_id"], bet["outcome"])
+        
+        if key not in positions_map:
+            positions_map[key] = {
+                "line_id": bet["line_id"],
+                "line": line,
+                "outcome": bet["outcome"],
+                "total_shares": 0,
+                "total_cost": 0,
+                "total_payout": 0,
+                "has_payout": False,
+            }
+        
+        shares = bet.get("shares") or 0
+        positions_map[key]["total_shares"] += shares
+        positions_map[key]["total_cost"] += bet["stake"]
+        
+        if bet.get("payout") is not None:
+            positions_map[key]["total_payout"] += bet["payout"]
+            positions_map[key]["has_payout"] = True
+    
+    # Build response
+    positions = []
+    for key, pos in positions_map.items():
+        line = pos["line"]
+        
+        # Calculate current price
+        odds = calculate_odds(line["yes_pool"], line["no_pool"])
+        current_price = odds.yes_probability if pos["outcome"] == "yes" else odds.no_probability
+        
+        # Calculate values
+        total_shares = pos["total_shares"]
+        total_cost = pos["total_cost"]
+        avg_buy_price = total_cost / total_shares if total_shares > 0 else 0
+        
+        is_resolved = line["resolved"]
+        
+        if is_resolved:
+            # Use actual payout
+            current_value = pos["total_payout"]
+            pnl = current_value - total_cost
+        else:
+            # Use current market value
+            current_value = total_shares * current_price
+            pnl = current_value - total_cost
+        
+        pnl_percent = (pnl / total_cost * 100) if total_cost > 0 else 0
+        
+        positions.append(PositionResponse(
+            line_id=pos["line_id"],
+            line_title=line["title"],
+            line_resolved=is_resolved,
+            line_correct_outcome=line.get("correct_outcome"),
+            outcome=pos["outcome"],
+            total_shares=total_shares,
+            total_cost=total_cost,
+            avg_buy_price=avg_buy_price,
+            current_price=current_price,
+            current_value=current_value,
+            pnl=pnl,
+            pnl_percent=pnl_percent,
+            payout=pos["total_payout"] if pos["has_payout"] else None,
+            is_active=not is_resolved
+        ))
+    
+    # Sort: active first, then by P&L
+    positions.sort(key=lambda p: (not p.is_active, -p.pnl))
+    
+    return positions
+
+
+@router.get("/portfolio", response_model=PortfolioSummary)
+async def get_portfolio_summary(
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """
+    Get overall portfolio summary with P&L calculations.
+    
+    Key distinction:
+    - Active positions: value is based on current market price (unrealized)
+    - Resolved positions: payout already added to cash balance, so we only track for P&L history
+    """
+    admin_client = get_supabase_admin()
+    
+    # Get all bets with line data
+    result = admin_client.table("bets")\
+        .select("*, lines(*)")\
+        .eq("user_id", str(current_user.id))\
+        .execute()
+    
+    # Track active positions only for current value
+    active_invested = 0  # Cost basis of active positions
+    active_value = 0     # Current market value of active positions
+    
+    # Track all-time P&L (including resolved)
+    total_invested = 0   # All-time cost basis
+    total_returned = 0   # All-time value (payouts + current value)
+    
+    active_count = 0
+    resolved_count = 0
+    seen_positions = set()
+    
+    for bet in result.data:
+        line = bet.get("lines", {})
+        if not line:
+            continue
+        
+        shares = bet.get("shares") or 0
+        stake = bet["stake"]
+        is_resolved = line["resolved"]
+        position_key = (bet["line_id"], bet["outcome"])
+        
+        total_invested += stake
+        
+        if is_resolved:
+            # Resolved: payout already in cash balance
+            payout = bet.get("payout") or 0
+            total_returned += payout
+        else:
+            # Active: track separately
+            active_invested += stake
+            odds = calculate_odds(line["yes_pool"], line["no_pool"])
+            current_price = odds.yes_probability if bet["outcome"] == "yes" else odds.no_probability
+            position_value = shares * current_price
+            active_value += position_value
+            total_returned += position_value
+        
+        # Count unique positions
+        if position_key not in seen_positions:
+            seen_positions.add(position_key)
+            if is_resolved:
+                resolved_count += 1
+            else:
+                active_count += 1
+    
+    # P&L is all-time: what you got back vs what you put in
+    total_pnl = total_returned - total_invested
+    total_pnl_percent = (total_pnl / total_invested * 100) if total_invested > 0 else 0
+    
+    # Portfolio value = cash + active positions value (resolved payouts already in cash)
+    total_portfolio_value = current_user.karma_balance + active_value
+    
+    return PortfolioSummary(
+        cash_balance=current_user.karma_balance,
+        invested_value=active_invested,      # Only active positions
+        positions_value=active_value,        # Only active positions
+        total_portfolio_value=total_portfolio_value,
+        total_pnl=total_pnl,                 # All-time P&L
+        total_pnl_percent=total_pnl_percent,
+        active_positions_count=active_count,
+        resolved_positions_count=resolved_count
+    )

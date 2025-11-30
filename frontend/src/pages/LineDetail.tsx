@@ -62,7 +62,7 @@ export default function LineDetail() {
     const finalStake = buyMode === 'amount' ? stake : Math.ceil(calculateCostForShares(targetShares, outcome));
 
     if (finalStake > user.karma_balance) {
-      setError(`Insufficient funds. Balance: ${user.karma_balance}`);
+      setError(`Insufficient GOOS. Available: ${user.karma_balance}`);
       return;
     }
 
@@ -149,7 +149,7 @@ export default function LineDetail() {
       <div className="market-title-section">
         <h1>{line.title}</h1>
         <div className="market-stats">
-          <span>Volume: ${(line.volume || 0).toLocaleString()}</span>
+          <span>Volume: GOOS {(line.volume || 0).toLocaleString()}</span>
           <span>Ends: {formatDate(line.closes_at)}</span>
           <span className={`status-badge ${line.resolved ? 'resolved' : isOpen ? 'open' : 'closed'}`}>
             {line.resolved ? 'Resolved' : isOpen ? 'Trading Open' : 'Trading Closed'}
@@ -178,7 +178,7 @@ export default function LineDetail() {
           >
             <div style={{fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '0.25rem'}}>Yes</div>
             <div style={{fontSize: '1.5rem', fontWeight: 800}}>{(line.odds.yes_probability * 100).toFixed(0)}%</div>
-            <div style={{fontSize: '0.8rem', opacity: 0.7}}>${line.odds.yes_probability.toFixed(2)}</div>
+            <div style={{fontSize: '0.8rem', opacity: 0.7}}>GOOS {line.odds.yes_probability.toFixed(2)}</div>
           </button>
           <button 
             className={`outcome-btn ${outcome === 'no' ? 'selected no' : ''}`}
@@ -186,7 +186,7 @@ export default function LineDetail() {
           >
             <div style={{fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '0.25rem'}}>No</div>
             <div style={{fontSize: '1.5rem', fontWeight: 800}}>{(line.odds.no_probability * 100).toFixed(0)}%</div>
-            <div style={{fontSize: '0.8rem', opacity: 0.7}}>${line.odds.no_probability.toFixed(2)}</div>
+            <div style={{fontSize: '0.8rem', opacity: 0.7}}>GOOS {line.odds.no_probability.toFixed(2)}</div>
           </button>
         </div>
 
@@ -197,7 +197,7 @@ export default function LineDetail() {
                 className={`tab-btn ${buyMode === 'amount' ? 'active' : ''}`}
                 onClick={() => setBuyMode('amount')}
               >
-                Buy in Dollars
+                Amount ($G)
               </button>
               <button 
                 className={`tab-btn ${buyMode === 'shares' ? 'active' : ''}`}
@@ -209,7 +209,7 @@ export default function LineDetail() {
 
             <form onSubmit={handlePlaceBet}>
               <div className="trade-input-container">
-                {buyMode === 'amount' && <div className="currency-prefix">$</div>}
+                {buyMode === 'amount' && <div className="currency-prefix">GOOS</div>}
                 <input
                   className="huge-input"
                   type="number"
@@ -224,7 +224,7 @@ export default function LineDetail() {
               <div className="order-summary-card">
                  <div className="summary-row">
                    <span className="summary-label">Avg Price</span>
-                   <span className="summary-val">${estPrice.toFixed(2)}</span>
+                   <span className="summary-val">GOOS {estPrice.toFixed(2)}</span>
                  </div>
                  <div className="summary-row">
                    <span className="summary-label">Est Shares</span>
@@ -232,11 +232,11 @@ export default function LineDetail() {
                  </div>
                  <div className="summary-row">
                    <span className="summary-label">Potential Return</span>
-                   <span className="summary-val">${estShares.toFixed(0)} ({estCost > 0 ? ((estShares / estCost - 1) * 100).toFixed(0) : 0}%)</span>
+                   <span className="summary-val">GOOS {estShares.toFixed(0)} ({estCost > 0 ? ((estShares / estCost - 1) * 100).toFixed(0) : 0}%)</span>
                  </div>
                  <div className="summary-row">
                    <span className="summary-label">Total Cost</span>
-                   <span className="summary-val">${estCost.toFixed(2)}</span>
+                   <span className="summary-val">GOOS {estCost.toFixed(2)}</span>
                  </div>
               </div>
 
@@ -249,7 +249,7 @@ export default function LineDetail() {
               </button>
               
               <div className="balance-hint">
-                Available: {user.karma_balance.toLocaleString()} GOOSE
+                Available: GOOS {user.karma_balance.toLocaleString()}
               </div>
             </form>
           </>

@@ -173,7 +173,7 @@ All cosmetic → safe for minors.
 
 ## Phase 5 — Monetization-Compatible / University Scale
 
-Using virtual currency (no real money).
+Using virtual points (GOOS tokens, not real currency).
 
 ### 14. Multi-Campus Support
 

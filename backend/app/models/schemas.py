@@ -88,6 +88,7 @@ class BetResponse(BaseModel):
     line_id: UUID
     outcome: Literal["yes", "no"]
     stake: int
+    shares: Optional[float] = None
     created_at: datetime
     potential_payout: Optional[float] = None
     buy_price: Optional[float] = None
@@ -95,6 +96,39 @@ class BetResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PositionResponse(BaseModel):
+    """Aggregated position for a user on a specific market."""
+    line_id: UUID
+    line_title: str
+    line_resolved: bool
+    line_correct_outcome: Optional[Literal["yes", "no"]]
+    outcome: Literal["yes", "no"]
+    total_shares: float
+    total_cost: float  # Total stake spent
+    avg_buy_price: float
+    current_price: float
+    current_value: float  # shares * current_price
+    pnl: float  # current_value - total_cost (or payout - total_cost if resolved)
+    pnl_percent: float
+    payout: Optional[float] = None  # If resolved
+    is_active: bool  # Not resolved yet
+
+    class Config:
+        from_attributes = True
+
+
+class PortfolioSummary(BaseModel):
+    """Overall portfolio metrics."""
+    cash_balance: int
+    invested_value: float  # Sum of all position costs
+    positions_value: float  # Sum of current values
+    total_portfolio_value: float  # cash + positions_value
+    total_pnl: float
+    total_pnl_percent: float
+    active_positions_count: int
+    resolved_positions_count: int
 
 
 # ============ Transaction Schemas ============

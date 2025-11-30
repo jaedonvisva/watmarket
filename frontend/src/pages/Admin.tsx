@@ -207,7 +207,7 @@ export default function Admin() {
                     </span>
                   </td>
                   <td>{(line.odds.yes_probability * 100).toFixed(0)}%</td>
-                  <td>${(line.volume || 0).toLocaleString()}</td>
+                  <td>GOOS {(line.volume || 0).toLocaleString()}</td>
                   <td>{formatDate(line.closes_at)}</td>
                   <td>
                     <button 
@@ -246,7 +246,7 @@ export default function Admin() {
               </div>
               <div className="detail-stat">
                 <span className="label">Volume</span>
-                <span className="value">${(selectedMarket.line.volume || 0).toLocaleString()}</span>
+                <span className="value">GOOS {(selectedMarket.line.volume || 0).toLocaleString()}</span>
               </div>
               <div className="detail-stat">
                 <span className="label">Yes Pool</span>

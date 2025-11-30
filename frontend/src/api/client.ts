@@ -87,6 +87,34 @@ export interface Transaction {
   created_at: string;
 }
 
+export interface Position {
+  line_id: string;
+  line_title: string;
+  line_resolved: boolean;
+  line_correct_outcome: 'yes' | 'no' | null;
+  outcome: 'yes' | 'no';
+  total_shares: number;
+  total_cost: number;
+  avg_buy_price: number;
+  current_price: number;
+  current_value: number;
+  pnl: number;
+  pnl_percent: number;
+  payout: number | null;
+  is_active: boolean;
+}
+
+export interface PortfolioSummary {
+  cash_balance: number;
+  invested_value: number;
+  positions_value: number;
+  total_portfolio_value: number;
+  total_pnl: number;
+  total_pnl_percent: number;
+  active_positions_count: number;
+  resolved_positions_count: number;
+}
+
 export interface PriceHistoryPoint {
   yes_price: number;
   no_price: number;
@@ -136,4 +164,8 @@ export const betsApi = {
   getForLine: (line_id: string) => api.get<Bet[]>(`/bets/line/${line_id}`),
   
   getAllForLine: (line_id: string) => api.get<AdminBet[]>(`/bets/line/${line_id}/all`),
+  
+  getPositions: () => api.get<Position[]>('/bets/positions'),
+  
+  getPortfolio: () => api.get<PortfolioSummary>('/bets/portfolio'),
 };

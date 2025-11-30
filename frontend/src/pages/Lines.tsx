@@ -104,7 +104,7 @@ export default function Lines() {
               </div>
 
               <div className="market-footer">
-                <span className="volume-label">${(line.volume || 0).toLocaleString()} Vol</span>
+                <span className="volume-label">GOOS {(line.volume || 0).toLocaleString()} Vol</span>
               </div>
             </Link>
           ))}

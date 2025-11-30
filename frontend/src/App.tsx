@@ -11,7 +11,7 @@ import Register from './pages/Register';
 import Lines from './pages/Lines';
 import LineDetail from './pages/LineDetail';
 import CreateLine from './pages/CreateLine';
-import Dashboard from './pages/Dashboard';
+import Portfolio from './pages/Portfolio';
 import Admin from './pages/Admin';
 import LoadingSpinner from './components/LoadingSpinner';
 import './App.css';
@@ -99,9 +99,9 @@ function Sidebar() {
 
         <Clock />
         <div className="user-balance">
-          <span className="label">Balance</span>
+          <span className="label">GOOS</span>
+          <span className="currency">GOOS</span>
           <span className="amount">{user.karma_balance.toLocaleString()}</span>
-          <span className="currency">GOOSE</span>
         </div>
         <button onClick={logout} className="logout-btn">Sign Out</button>
       </div>
@@ -135,7 +135,7 @@ function AppRoutes() {
         <Route path="/" element={<Layout><Lines /></Layout>} />
         <Route path="/lines/:id" element={<Layout><LineDetail /></Layout>} />
         <Route path="/lines/create" element={<Layout><CreateLine /></Layout>} />
-        <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
+        <Route path="/dashboard" element={<Layout><Portfolio /></Layout>} />
         <Route path="/admin" element={<Layout><Admin /></Layout>} />
       </Routes>
     </BrowserRouter>
