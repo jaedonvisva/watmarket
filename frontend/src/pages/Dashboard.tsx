@@ -44,7 +44,7 @@ export default function Dashboard() {
       <div className="dashboard-grid">
         <div className="stat-tile">
           <h4>Balance</h4>
-          <div className="val">{user.karma_balance.toLocaleString()}</div>
+          <div className="val">{user.karma_balance.toLocaleString()} <span style={{fontSize: '0.5em', opacity: 0.7}}>GOOSE</span></div>
         </div>
         <div className="stat-tile">
           <h4>Total Bets</h4>

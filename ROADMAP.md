@@ -96,7 +96,7 @@ Planned work:
 
 Planned work:
 - Rank users by:
-  - Total karma.
+  - Total GOOSE.
   - Net profit.
   - Win rate.
   - Volume traded.

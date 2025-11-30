@@ -249,7 +249,7 @@ export default function LineDetail() {
               </button>
               
               <div className="balance-hint">
-                Available Balance: ${user.karma_balance.toLocaleString()}
+                Available: {user.karma_balance.toLocaleString()} GOOSE
               </div>
             </form>
           </>

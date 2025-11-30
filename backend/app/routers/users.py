@@ -14,7 +14,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 async def register(user_data: UserCreate):
     """
     Register a new user account.
-    Creates auth user and profile with starting karma (1000).
+    Creates auth user and profile with starting GOOSE balance (1000).
     """
     try:
         supabase = get_supabase_client()

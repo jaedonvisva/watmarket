@@ -57,7 +57,7 @@ def resolve_line(line_id: UUID, correct_outcome: str) -> Dict:
     
     for bet in winning_bets:
         shares = bet.get("shares") or 0
-        # Karma is int, so we round the payout
+        # GOOSE is int, so we round the payout
         payout = int(round(shares))
         
         payouts.append({

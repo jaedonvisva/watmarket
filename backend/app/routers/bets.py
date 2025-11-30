@@ -41,7 +41,7 @@ async def place_bet(
         raise HTTPException(status_code=400, detail="Betting closed")
     
     if current_user.karma_balance < bet_data.stake:
-        raise HTTPException(status_code=400, detail="Insufficient karma")
+        raise HTTPException(status_code=400, detail="Insufficient GOOSE balance")
     
     # Deduct karma
     new_balance = current_user.karma_balance - bet_data.stake
@@ -120,7 +120,7 @@ async def get_my_bets(
         # In CPMM, potential payout is just shares * 1 (if not resolved yet)
         # If resolved, payout is in 'payout' field
         shares = bet.get("shares") or 0
-        potential_payout = shares if not bet.get("payout") else None
+        potential_payout = shares if bet.get("payout") is None else None
         
         bets.append(BetResponse(
             id=bet["id"],

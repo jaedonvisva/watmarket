@@ -101,7 +101,7 @@ function Sidebar() {
         <div className="user-balance">
           <span className="label">Balance</span>
           <span className="amount">{user.karma_balance.toLocaleString()}</span>
-          <span className="currency">WARRIORS</span>
+          <span className="currency">GOOSE</span>
         </div>
         <button onClick={logout} className="logout-btn">Sign Out</button>
       </div>
