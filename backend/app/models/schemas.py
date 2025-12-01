@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from typing import Optional, Literal
 from uuid import UUID
@@ -25,8 +25,7 @@ class UserResponse(BaseModel):
     is_admin: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserPublic(BaseModel):
@@ -66,8 +65,7 @@ class LineResponse(BaseModel):
     created_at: datetime
     odds: LineOdds
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LineResolve(BaseModel):
@@ -94,8 +92,7 @@ class BetResponse(BaseModel):
     buy_price: Optional[float] = None
     payout: Optional[float] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PositionResponse(BaseModel):
@@ -115,8 +112,7 @@ class PositionResponse(BaseModel):
     payout: Optional[float] = None  # If resolved
     is_active: bool  # Not resolved yet
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PortfolioSummary(BaseModel):
@@ -141,8 +137,7 @@ class TransactionResponse(BaseModel):
     reference_id: Optional[UUID]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TradeHistoryItem(BaseModel):
@@ -160,8 +155,7 @@ class TradeHistoryItem(BaseModel):
     result: Optional[Literal["won", "lost"]] = None
     payout: Optional[float] = None  # Amount received if resolved
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============ Auth Schemas ============
@@ -182,5 +176,4 @@ class PriceHistoryPoint(BaseModel):
     no_price: float
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

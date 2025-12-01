@@ -18,88 +18,58 @@ async def place_bet(
 ):
     """
     Place a bet (Buy Shares) on a prediction line using CPMM.
+    Uses atomic database function to prevent race conditions.
     """
     admin_client = get_supabase_admin()
     
-    # Get the line
-    line_result = admin_client.table("lines").select("*").eq("id", str(bet_data.line_id)).single().execute()
-    
-    if not line_result.data:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Line not found"
-        )
-    
-    line = line_result.data
-    
-    # Check resolution/closing
-    if line["resolved"]:
-        raise HTTPException(status_code=400, detail="Line resolved")
+    try:
+        # Call atomic bet placement function
+        result = admin_client.rpc('place_bet_atomic', {
+            'p_user_id': str(current_user.id),
+            'p_line_id': str(bet_data.line_id),
+            'p_outcome': bet_data.outcome,
+            'p_stake': bet_data.stake
+        }).execute()
         
-    closes_at = datetime.fromisoformat(line["closes_at"].replace("Z", "+00:00"))
-    if closes_at <= datetime.now(timezone.utc):
-        raise HTTPException(status_code=400, detail="Betting closed")
-    
-    if current_user.karma_balance < bet_data.stake:
-        raise HTTPException(status_code=400, detail="Insufficient GOOSE balance")
-    
-    # Deduct karma
-    new_balance = current_user.karma_balance - bet_data.stake
-    admin_client.table("users").update({
-        "karma_balance": new_balance
-    }).eq("id", str(current_user.id)).execute()
-    
-    # CPMM Buy
-    shares, new_yes, new_no = calculate_cpmm_buy(
-        bet_data.stake, 
-        bet_data.outcome, 
-        line["yes_pool"], 
-        line["no_pool"]
-    )
-    
-    # Update pools and volume
-    current_volume = line.get("volume", 0) or 0
-    admin_client.table("lines").update({
-        "yes_pool": new_yes,
-        "no_pool": new_no,
-        "volume": current_volume + bet_data.stake
-    }).eq("id", str(bet_data.line_id)).execute()
-    
-    # Calculate metrics
-    buy_price = bet_data.stake / shares if shares > 0 else 0
-    
-    # Create bet
-    bet_result = admin_client.table("bets").insert({
-        "user_id": str(current_user.id),
-        "line_id": str(bet_data.line_id),
-        "outcome": bet_data.outcome,
-        "stake": bet_data.stake,
-        "shares": shares,
-        "buy_price": buy_price
-    }).execute()
-    
-    bet = bet_result.data[0]
-    
-    # Transaction
-    admin_client.table("transactions").insert({
-        "user_id": str(current_user.id),
-        "amount": -bet_data.stake,
-        "type": "bet",
-        "reference_id": bet["id"]
-    }).execute()
-    
-    return BetResponse(
-        id=bet["id"],
-        user_id=bet["user_id"],
-        line_id=bet["line_id"],
-        outcome=bet["outcome"],
-        stake=bet["stake"],
-        shares=shares,
-        created_at=bet["created_at"],
-        potential_payout=shares, # 1:1 payout
-        buy_price=buy_price,
-        payout=None
-    )
+        if not result.data:
+            raise HTTPException(status_code=400, detail="Failed to place bet")
+        
+        bet_result = result.data
+        
+        # Fetch the created bet for full response
+        bet_record = admin_client.table("bets").select("*").eq("id", bet_result["bet_id"]).single().execute()
+        bet = bet_record.data
+        
+        return BetResponse(
+            id=bet["id"],
+            user_id=bet["user_id"],
+            line_id=bet["line_id"],
+            outcome=bet["outcome"],
+            stake=bet["stake"],
+            shares=bet_result["shares"],
+            created_at=bet["created_at"],
+            potential_payout=bet_result["shares"],  # 1:1 payout
+            buy_price=bet_result["buy_price"],
+            payout=None
+        )
+        
+    except Exception as e:
+        error_msg = str(e)
+        # Map database errors to HTTP errors
+        if "Insufficient balance" in error_msg:
+            raise HTTPException(status_code=400, detail="Insufficient GOOSE balance")
+        elif "Line not found" in error_msg:
+            raise HTTPException(status_code=404, detail="Line not found")
+        elif "Line is resolved" in error_msg:
+            raise HTTPException(status_code=400, detail="Line resolved")
+        elif "Betting closed" in error_msg:
+            raise HTTPException(status_code=400, detail="Betting closed")
+        elif "User not found" in error_msg:
+            raise HTTPException(status_code=404, detail="User not found")
+        elif "Invalid outcome" in error_msg:
+            raise HTTPException(status_code=400, detail="Invalid outcome: must be yes or no")
+        else:
+            raise HTTPException(status_code=500, detail=f"Failed to place bet: {error_msg}")
 
 
 @router.get("/my", response_model=List[BetResponse])
