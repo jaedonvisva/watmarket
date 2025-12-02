@@ -6,13 +6,14 @@ import type { Position, Trade } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
-import { TrendingUp, TrendingDown, Wallet, PieChart, Download } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, PieChart, Download, Layers, List } from 'lucide-react';
 
 type TabType = 'positions' | 'history';
 
 export default function Portfolio() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('positions');
+  const [groupByMarket, setGroupByMarket] = useState(false);
 
   const { data: portfolio, isLoading: loadingPortfolio } = useQuery({
     queryKey: ['portfolio'],
@@ -153,10 +154,20 @@ export default function Portfolio() {
         </div>
         
         {activeTab === 'history' && trades.length > 0 && (
-          <button className="export-btn" onClick={exportToCSV}>
-            <Download size={14} />
-            Export CSV
-          </button>
+          <div className="history-controls">
+            <button 
+              className={`group-toggle ${groupByMarket ? 'active' : ''}`}
+              onClick={() => setGroupByMarket(!groupByMarket)}
+              title={groupByMarket ? 'Show flat list' : 'Group by market'}
+            >
+              {groupByMarket ? <List size={14} /> : <Layers size={14} />}
+              {groupByMarket ? 'Flat' : 'Group'}
+            </button>
+            <button className="export-btn" onClick={exportToCSV}>
+              <Download size={14} />
+              Export CSV
+            </button>
+          </div>
         )}
       </div>
 
@@ -208,6 +219,8 @@ export default function Portfolio() {
               description="Your trade history will appear here after you place bets."
               icon="📝"
             />
+          ) : groupByMarket ? (
+            <GroupedTradesView trades={trades} formatDate={formatDate} />
           ) : (
             <div className="history-table-wrapper">
               <table className="history-table">
@@ -241,7 +254,7 @@ export default function Portfolio() {
                       <td>
                         {trade.result ? (
                           <span className={`result-badge ${trade.result}`}>
-                            {trade.result === 'won' ? `Won (+${trade.payout?.toFixed(0) || 0})` : 'Lost (0)'}
+                            {trade.result === 'won' ? `Won (+${trade.payout?.toFixed(0) || 0})` : `Lost (-${trade.cost.toFixed(0)})`}
                           </span>
                         ) : (
                           <span className="result-badge pending">Open</span>
@@ -256,6 +269,96 @@ export default function Portfolio() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function GroupedTradesView({ trades, formatDate }: { trades: Trade[]; formatDate: (d: string) => string }) {
+  // Group trades by line_id
+  const grouped = trades.reduce((acc, trade) => {
+    if (!acc[trade.line_id]) {
+      acc[trade.line_id] = {
+        line_id: trade.line_id,
+        line_title: trade.line_title,
+        trades: [],
+        totalCost: 0,
+        totalPayout: 0,
+        netPnL: 0,
+      };
+    }
+    acc[trade.line_id].trades.push(trade);
+    acc[trade.line_id].totalCost += trade.cost;
+    if (trade.result === 'won') {
+      acc[trade.line_id].totalPayout += trade.payout || 0;
+      acc[trade.line_id].netPnL += (trade.payout || 0) - trade.cost;
+    } else if (trade.result === 'lost') {
+      acc[trade.line_id].netPnL -= trade.cost;
+    }
+    return acc;
+  }, {} as Record<string, { line_id: string; line_title: string; trades: Trade[]; totalCost: number; totalPayout: number; netPnL: number }>);
+
+  const groups = Object.values(grouped).sort((a, b) => {
+    const aLatest = Math.max(...a.trades.map(t => new Date(t.created_at).getTime()));
+    const bLatest = Math.max(...b.trades.map(t => new Date(t.created_at).getTime()));
+    return bLatest - aLatest;
+  });
+
+  return (
+    <div className="grouped-trades">
+      {groups.map((group) => (
+        <div key={group.line_id} className="trade-group">
+          <div className="group-header">
+            <Link to={`/lines/${group.line_id}`} className="group-title">
+              {group.line_title}
+            </Link>
+            <div className="group-summary">
+              <span className="group-stat">{group.trades.length} trade{group.trades.length !== 1 ? 's' : ''}</span>
+              <span className="group-stat">Cost: {group.totalCost.toLocaleString()}</span>
+              {group.netPnL !== 0 && (
+                <span className={`group-pnl ${group.netPnL >= 0 ? 'positive' : 'negative'}`}>
+                  {group.netPnL >= 0 ? '+' : ''}{group.netPnL.toFixed(0)}
+                </span>
+              )}
+            </div>
+          </div>
+          <table className="history-table compact">
+            <thead>
+              <tr>
+                <th>Side</th>
+                <th>Shares</th>
+                <th>Price</th>
+                <th>Cost</th>
+                <th>Result</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {group.trades.map((trade) => (
+                <tr key={trade.id} className={trade.result ? `result-${trade.result}` : ''}>
+                  <td>
+                    <span className={`side-badge ${trade.outcome}`}>
+                      {trade.outcome.toUpperCase()}
+                    </span>
+                  </td>
+                  <td className="shares-cell">{trade.shares.toFixed(2)}</td>
+                  <td className="price-cell">{trade.buy_price.toFixed(2)}</td>
+                  <td className="cost-cell">{trade.cost.toLocaleString()}</td>
+                  <td>
+                    {trade.result ? (
+                      <span className={`result-badge ${trade.result}`}>
+                        {trade.result === 'won' ? `Won (+${trade.payout?.toFixed(0) || 0})` : `Lost (-${trade.cost.toFixed(0)})`}
+                      </span>
+                    ) : (
+                      <span className="result-badge pending">Open</span>
+                    )}
+                  </td>
+                  <td className="date-cell">{formatDate(trade.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
     </div>
   );
 }
