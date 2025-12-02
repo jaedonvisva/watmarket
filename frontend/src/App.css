@@ -1522,6 +1522,188 @@ input[type=number] {
   color: var(--gold);
 }
 
+.filter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 0.5rem;
+  transition: all 0.2s;
+}
+
+.filter-toggle:hover {
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+}
+
+.filter-toggle.active {
+  background: var(--bg-hover);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.filter-toggle.has-filters {
+  border-color: var(--gold);
+}
+
+.filter-count {
+  background: var(--gold);
+  color: #000;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+  margin-left: 0.25rem;
+}
+
+/* Filters Panel */
+.filters-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  padding: 1rem 1.25rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  margin-bottom: 1rem;
+  align-items: flex-end;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.filter-group label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.search-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  min-width: 200px;
+}
+
+.search-input-wrapper svg {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.filter-search {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  width: 100%;
+  outline: none;
+}
+
+.filter-search::placeholder {
+  color: var(--text-secondary);
+}
+
+.clear-search {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.clear-search:hover {
+  color: var(--text-primary);
+  background: var(--border);
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--bg-hover);
+  padding: 0.25rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+}
+
+.filter-btn {
+  padding: 0.4rem 0.75rem;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 0.35rem;
+  transition: all 0.2s;
+}
+
+.filter-btn:hover {
+  color: var(--text-primary);
+}
+
+.filter-btn.active {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.filter-btn.active.won {
+  color: var(--green);
+}
+
+.filter-btn.active.lost {
+  color: var(--red);
+}
+
+.filter-btn.active.yes {
+  color: var(--green);
+}
+
+.filter-btn.active.no {
+  color: var(--red);
+}
+
+.clear-filters-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 0.5rem;
+  transition: all 0.2s;
+  margin-left: auto;
+}
+
+.clear-filters-btn:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
 /* Grouped Trades View */
 .grouped-trades {
   display: flex;

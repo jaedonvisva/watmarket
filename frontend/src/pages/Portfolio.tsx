@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { betsApi, authApi } from '../api/client';
@@ -6,7 +6,10 @@ import type { Position, Trade } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
-import { TrendingUp, TrendingDown, Wallet, PieChart, Download, Layers, List } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, PieChart, Download, Layers, List, Filter, X, Search } from 'lucide-react';
+
+type ResultFilter = 'all' | 'won' | 'lost' | 'open';
+type SideFilter = 'all' | 'yes' | 'no';
 
 type TabType = 'positions' | 'history';
 
@@ -14,6 +17,10 @@ export default function Portfolio() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('positions');
   const [groupByMarket, setGroupByMarket] = useState(false);
+  const [resultFilter, setResultFilter] = useState<ResultFilter>('all');
+  const [sideFilter, setSideFilter] = useState<SideFilter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
 
   const { data: portfolio, isLoading: loadingPortfolio } = useQuery({
     queryKey: ['portfolio'],
@@ -52,6 +59,32 @@ export default function Portfolio() {
   const formatPercent = (value: number) => {
     const sign = value >= 0 ? '+' : '';
     return `${sign}${value.toFixed(1)}%`;
+  };
+
+  // Filter trades based on current filters
+  const filteredTrades = useMemo(() => {
+    return trades.filter((trade: Trade) => {
+      // Result filter
+      if (resultFilter === 'won' && trade.result !== 'won') return false;
+      if (resultFilter === 'lost' && trade.result !== 'lost') return false;
+      if (resultFilter === 'open' && trade.result !== null) return false;
+      
+      // Side filter
+      if (sideFilter !== 'all' && trade.outcome !== sideFilter) return false;
+      
+      // Search filter
+      if (searchQuery && !trade.line_title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      
+      return true;
+    });
+  }, [trades, resultFilter, sideFilter, searchQuery]);
+
+  const hasActiveFilters = resultFilter !== 'all' || sideFilter !== 'all' || searchQuery !== '';
+
+  const clearFilters = () => {
+    setResultFilter('all');
+    setSideFilter('all');
+    setSearchQuery('');
   };
 
   const exportToCSV = () => {
@@ -156,6 +189,15 @@ export default function Portfolio() {
         {activeTab === 'history' && trades.length > 0 && (
           <div className="history-controls">
             <button 
+              className={`filter-toggle ${showFilters ? 'active' : ''} ${hasActiveFilters ? 'has-filters' : ''}`}
+              onClick={() => setShowFilters(!showFilters)}
+              title="Toggle filters"
+            >
+              <Filter size={14} />
+              Filters
+              {hasActiveFilters && <span className="filter-count">{[resultFilter !== 'all', sideFilter !== 'all', searchQuery !== ''].filter(Boolean).length}</span>}
+            </button>
+            <button 
               className={`group-toggle ${groupByMarket ? 'active' : ''}`}
               onClick={() => setGroupByMarket(!groupByMarket)}
               title={groupByMarket ? 'Show flat list' : 'Group by market'}
@@ -170,6 +212,67 @@ export default function Portfolio() {
           </div>
         )}
       </div>
+
+      {/* Filters Panel */}
+      {activeTab === 'history' && showFilters && (
+        <div className="filters-panel">
+          <div className="filter-group">
+            <label>Search Market</label>
+            <div className="search-input-wrapper">
+              <Search size={14} />
+              <input
+                type="text"
+                placeholder="Search by market name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="filter-search"
+              />
+              {searchQuery && (
+                <button className="clear-search" onClick={() => setSearchQuery('')}>
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+          
+          <div className="filter-group">
+            <label>Result</label>
+            <div className="filter-buttons">
+              {(['all', 'won', 'lost', 'open'] as ResultFilter[]).map((filter) => (
+                <button
+                  key={filter}
+                  className={`filter-btn ${resultFilter === filter ? 'active' : ''} ${filter}`}
+                  onClick={() => setResultFilter(filter)}
+                >
+                  {filter === 'all' ? 'All' : filter.charAt(0).toUpperCase() + filter.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          <div className="filter-group">
+            <label>Side</label>
+            <div className="filter-buttons">
+              {(['all', 'yes', 'no'] as SideFilter[]).map((filter) => (
+                <button
+                  key={filter}
+                  className={`filter-btn ${sideFilter === filter ? 'active' : ''} ${filter}`}
+                  onClick={() => setSideFilter(filter)}
+                >
+                  {filter === 'all' ? 'All' : filter.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {hasActiveFilters && (
+            <button className="clear-filters-btn" onClick={clearFilters}>
+              <X size={14} />
+              Clear all filters
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Content */}
       {activeTab === 'positions' ? (
@@ -219,8 +322,17 @@ export default function Portfolio() {
               description="Your trade history will appear here after you place bets."
               icon="📝"
             />
+          ) : filteredTrades.length === 0 && hasActiveFilters ? (
+            <EmptyState
+              title="No matching trades"
+              description="Try adjusting your filters to see more results."
+              icon="🔍"
+              action={
+                <button className="btn-primary" onClick={clearFilters}>Clear Filters</button>
+              }
+            />
           ) : groupByMarket ? (
-            <GroupedTradesView trades={trades} formatDate={formatDate} />
+            <GroupedTradesView trades={filteredTrades} formatDate={formatDate} />
           ) : (
             <div className="history-table-wrapper">
               <table className="history-table">
@@ -236,7 +348,7 @@ export default function Portfolio() {
                   </tr>
                 </thead>
                 <tbody>
-                  {trades.map((trade: Trade) => (
+                  {filteredTrades.map((trade: Trade) => (
                     <tr key={trade.id} className={trade.result ? `result-${trade.result}` : ''}>
                       <td className="market-cell">
                         <Link to={`/lines/${trade.line_id}`} className="market-link">
