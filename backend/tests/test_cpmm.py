@@ -19,7 +19,7 @@ from typing import List, Tuple, Dict
 import sys
 sys.path.insert(0, '/Users/jaedonvisva/side-projects/watmarket/backend')
 
-from app.services.odds import calculate_odds, calculate_cpmm_buy, calculate_potential_payout
+from app.services.odds import calculate_odds, calculate_cpmm_buy, calculate_cpmm_sell, calculate_cpmm_sell_with_pools, calculate_potential_payout
 from app.models.schemas import LineOdds
 
 
@@ -658,6 +658,146 @@ class TestMathematicalProperties:
         # In a fair market, EV should be close to stake
         # (slightly less due to slippage)
         assert expected_value <= stake, "Should not have positive expected value"
+
+
+# =============================================================================
+# TEST: CPMM SELL MECHANICS
+# =============================================================================
+
+class TestCPMMSell:
+    """Tests for calculate_cpmm_sell and calculate_cpmm_sell_with_pools functions."""
+
+    def test_buy_then_sell_returns_investment(self, balanced_pool):
+        """Buying then immediately selling should return exact investment."""
+        investment = 10
+        shares, new_yes, new_no = calculate_cpmm_buy(
+            investment, "yes", balanced_pool["yes_pool"], balanced_pool["no_pool"]
+        )
+        
+        sell_amount = calculate_cpmm_sell(shares, "yes", new_yes, new_no)
+        
+        assert abs(sell_amount - investment) < 0.0001, \
+            f"Should get back investment: got {sell_amount}, expected {investment}"
+
+    def test_buy_then_sell_restores_pools(self, balanced_pool):
+        """Buying then selling should restore pools to original state."""
+        investment = 10
+        shares, new_yes, new_no = calculate_cpmm_buy(
+            investment, "yes", balanced_pool["yes_pool"], balanced_pool["no_pool"]
+        )
+        
+        sell_amount, final_yes, final_no = calculate_cpmm_sell_with_pools(
+            shares, "yes", new_yes, new_no
+        )
+        
+        assert abs(final_yes - balanced_pool["yes_pool"]) < 0.0001
+        assert abs(final_no - balanced_pool["no_pool"]) < 0.0001
+
+    def test_sell_preserves_invariant(self, balanced_pool):
+        """k = yes * no should be preserved after sell."""
+        investment = 50
+        shares, new_yes, new_no = calculate_cpmm_buy(
+            investment, "yes", balanced_pool["yes_pool"], balanced_pool["no_pool"]
+        )
+        
+        k_before = new_yes * new_no
+        
+        sell_amount, final_yes, final_no = calculate_cpmm_sell_with_pools(
+            shares / 2, "yes", new_yes, new_no  # Sell half
+        )
+        
+        k_after = final_yes * final_no
+        assert abs(k_before - k_after) < 0.001, f"Invariant broken: {k_before} != {k_after}"
+
+    def test_sell_after_price_increase_gives_profit(self, balanced_pool):
+        """Selling after price moves in your favor should give profit."""
+        # User A buys YES
+        shares_a, yes1, no1 = calculate_cpmm_buy(
+            10, "yes", balanced_pool["yes_pool"], balanced_pool["no_pool"]
+        )
+        
+        # User B also buys YES (price goes up)
+        _, yes2, no2 = calculate_cpmm_buy(50, "yes", yes1, no1)
+        
+        # User A sells at higher price
+        sell_amount = calculate_cpmm_sell(shares_a, "yes", yes2, no2)
+        
+        assert sell_amount > 10, f"Should profit when price moves up: got {sell_amount}"
+
+    def test_sell_after_price_decrease_gives_loss(self, balanced_pool):
+        """Selling after price moves against you should give loss."""
+        # User A buys YES
+        shares_a, yes1, no1 = calculate_cpmm_buy(
+            10, "yes", balanced_pool["yes_pool"], balanced_pool["no_pool"]
+        )
+        
+        # User B buys NO (YES price goes down)
+        _, yes2, no2 = calculate_cpmm_buy(50, "no", yes1, no1)
+        
+        # User A sells at lower price
+        sell_amount = calculate_cpmm_sell(shares_a, "yes", yes2, no2)
+        
+        assert sell_amount < 10, f"Should lose when price moves down: got {sell_amount}"
+
+    def test_sell_no_shares(self, balanced_pool):
+        """Selling NO shares should work symmetrically."""
+        investment = 10
+        shares, new_yes, new_no = calculate_cpmm_buy(
+            investment, "no", balanced_pool["yes_pool"], balanced_pool["no_pool"]
+        )
+        
+        sell_amount, final_yes, final_no = calculate_cpmm_sell_with_pools(
+            shares, "no", new_yes, new_no
+        )
+        
+        assert abs(sell_amount - investment) < 0.0001
+        assert abs(final_yes - balanced_pool["yes_pool"]) < 0.0001
+        assert abs(final_no - balanced_pool["no_pool"]) < 0.0001
+
+    def test_partial_sell(self, balanced_pool):
+        """Selling partial shares should work correctly."""
+        investment = 100
+        shares, new_yes, new_no = calculate_cpmm_buy(
+            investment, "yes", balanced_pool["yes_pool"], balanced_pool["no_pool"]
+        )
+        
+        # Sell half the shares
+        half_shares = shares / 2
+        sell_amount, final_yes, final_no = calculate_cpmm_sell_with_pools(
+            half_shares, "yes", new_yes, new_no
+        )
+        
+        # Should get back some positive amount
+        assert sell_amount > 0
+        
+        # Selling remaining half should give back the rest
+        remaining_sell = calculate_cpmm_sell(half_shares, "yes", final_yes, final_no)
+        total_back = sell_amount + remaining_sell
+        
+        # Total should equal original investment
+        assert abs(total_back - investment) < 0.001
+
+    def test_zero_shares_returns_zero(self, balanced_pool):
+        """Selling zero shares should return zero."""
+        sell_amount = calculate_cpmm_sell(
+            0, "yes", balanced_pool["yes_pool"], balanced_pool["no_pool"]
+        )
+        assert sell_amount == 0
+
+    def test_sell_price_less_than_buy_price_immediately(self, balanced_pool):
+        """Sell price should equal buy price when selling immediately."""
+        investment = 10
+        shares, new_yes, new_no = calculate_cpmm_buy(
+            investment, "yes", balanced_pool["yes_pool"], balanced_pool["no_pool"]
+        )
+        
+        buy_price = investment / shares
+        
+        sell_amount = calculate_cpmm_sell(shares, "yes", new_yes, new_no)
+        sell_price = sell_amount / shares
+        
+        # Should be equal when selling immediately
+        assert abs(buy_price - sell_price) < 0.0001
 
 
 # =============================================================================

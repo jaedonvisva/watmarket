@@ -92,17 +92,18 @@ async def get_me(current_user: UserResponse = Depends(get_current_user)):
 
 @router.get("/me/trades", response_model=List[TradeHistoryItem])
 async def get_my_trades(current_user: UserResponse = Depends(get_current_user)):
-    """Get current user's trade history - one row per bet with payout info."""
+    """Get current user's trade history - buys and sells merged."""
     admin_client = get_supabase_admin()
     
-    # Get all bets with line data
+    trades = []
+    
+    # Get all bets (buys)
     bets_result = admin_client.table("bets")\
         .select("*, lines(id, title, resolved, correct_outcome)")\
         .eq("user_id", str(current_user.id))\
         .order("created_at", desc=True)\
         .execute()
     
-    trades = []
     for bet in bets_result.data:
         line = bet.get("lines", {}) or {}
         if not line:
@@ -128,12 +129,39 @@ async def get_my_trades(current_user: UserResponse = Depends(get_current_user)):
             line_id=bet["line_id"],
             line_title=line.get("title", "Unknown"),
             outcome=bet["outcome"],
+            type="buy",
             shares=bet.get("shares") or 0,
-            buy_price=bet.get("buy_price") or 0,
-            cost=bet["stake"],
+            price=bet.get("buy_price") or 0,
+            amount=bet["stake"],
             is_resolved=is_resolved,
             result=result,
             payout=payout
         ))
     
+    # Get sell transactions
+    sells_result = admin_client.table("transactions")\
+        .select("*")\
+        .eq("user_id", str(current_user.id))\
+        .eq("type", "sell")\
+        .order("created_at", desc=True)\
+        .execute()
+    
+    for tx in sells_result.data:
+        metadata = tx.get("metadata") or {}
+        trades.append(TradeHistoryItem(
+            id=tx["id"],
+            created_at=tx["created_at"],
+            line_id=tx["reference_id"],
+            line_title=metadata.get("line_title", "Unknown"),
+            outcome=metadata.get("outcome", "yes"),
+            type="sell",
+            shares=metadata.get("shares", 0),
+            price=metadata.get("sell_price", 0),
+            amount=tx["amount"],
+            is_resolved=False,
+            result=None,
+            payout=None
+        ))
+    
+    trades.sort(key=lambda t: t.created_at, reverse=True)
     return trades

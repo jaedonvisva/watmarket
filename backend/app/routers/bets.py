@@ -4,9 +4,9 @@ from uuid import UUID
 from datetime import datetime, timezone
 
 from app.database import get_supabase_admin
-from app.models.schemas import BetCreate, BetResponse, UserResponse, PositionResponse, PortfolioSummary
+from app.models.schemas import BetCreate, BetResponse, UserResponse, PositionResponse, PortfolioSummary, SellSharesRequest, SellSharesResponse
 from app.services.auth import get_current_user
-from app.services.odds import calculate_cpmm_buy, calculate_odds
+from app.services.odds import calculate_cpmm_buy, calculate_cpmm_sell, calculate_odds
 
 router = APIRouter(prefix="/bets", tags=["bets"])
 
@@ -70,6 +70,56 @@ async def place_bet(
             raise HTTPException(status_code=400, detail="Invalid outcome: must be yes or no")
         else:
             raise HTTPException(status_code=500, detail=f"Failed to place bet: {error_msg}")
+
+
+@router.post("/sell", response_model=SellSharesResponse)
+async def sell_shares(
+    sell_data: SellSharesRequest,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """
+    Sell shares from a position using CPMM.
+    Uses atomic database function to prevent race conditions.
+    """
+    admin_client = get_supabase_admin()
+    
+    try:
+        # Call atomic sell function
+        result = admin_client.rpc('sell_shares_atomic', {
+            'p_user_id': str(current_user.id),
+            'p_line_id': str(sell_data.line_id),
+            'p_outcome': sell_data.outcome,
+            'p_shares': sell_data.shares
+        }).execute()
+        
+        if not result.data:
+            raise HTTPException(status_code=400, detail="Failed to sell shares")
+        
+        sell_result = result.data
+        
+        return SellSharesResponse(
+            shares_sold=sell_result["shares_sold"],
+            amount_received=sell_result["amount_received"],
+            sell_price=sell_result["sell_price"],
+            new_balance=sell_result["new_balance"],
+            remaining_shares=sell_result["remaining_shares"]
+        )
+        
+    except Exception as e:
+        error_msg = str(e)
+        # Map database errors to HTTP errors
+        if "Insufficient shares" in error_msg:
+            raise HTTPException(status_code=400, detail="Insufficient shares to sell")
+        elif "Line not found" in error_msg:
+            raise HTTPException(status_code=404, detail="Market not found")
+        elif "Cannot sell shares on resolved market" in error_msg:
+            raise HTTPException(status_code=400, detail="Cannot sell shares on resolved market")
+        elif "Invalid outcome" in error_msg:
+            raise HTTPException(status_code=400, detail="Invalid outcome: must be yes or no")
+        elif "Sell amount too small" in error_msg:
+            raise HTTPException(status_code=400, detail="Sell amount too small")
+        else:
+            raise HTTPException(status_code=500, detail=f"Failed to sell shares: {error_msg}")
 
 
 @router.get("/my", response_model=List[BetResponse])
@@ -222,8 +272,13 @@ async def get_positions(
             current_value = pos["total_payout"]
             pnl = current_value - total_cost
         else:
-            # Use current market value
-            current_value = total_shares * current_price
+            # Use actual sell value from CPMM (what you'd get if you sold now)
+            current_value = calculate_cpmm_sell(
+                total_shares,
+                pos["outcome"],
+                line["yes_pool"],
+                line["no_pool"]
+            )
             pnl = current_value - total_cost
         
         pnl_percent = (pnl / total_cost * 100) if total_cost > 0 else 0
@@ -295,19 +350,19 @@ async def get_portfolio_summary(
         total_invested += stake
         
         if is_resolved:
-            # Resolved: payout already in cash balance
             payout = bet.get("payout") or 0
             total_returned += payout
         else:
-            # Active: track separately
             active_invested += stake
-            odds = calculate_odds(line["yes_pool"], line["no_pool"])
-            current_price = odds.yes_probability if bet["outcome"] == "yes" else odds.no_probability
-            position_value = shares * current_price
+            position_value = calculate_cpmm_sell(
+                shares,
+                bet["outcome"],
+                line["yes_pool"],
+                line["no_pool"]
+            )
             active_value += position_value
             total_returned += position_value
         
-        # Count unique positions
         if position_key not in seen_positions:
             seen_positions.add(position_key)
             if is_resolved:
@@ -315,19 +370,16 @@ async def get_portfolio_summary(
             else:
                 active_count += 1
     
-    # P&L is all-time: what you got back vs what you put in
     total_pnl = total_returned - total_invested
     total_pnl_percent = (total_pnl / total_invested * 100) if total_invested > 0 else 0
-    
-    # Portfolio value = cash + active positions value (resolved payouts already in cash)
     total_portfolio_value = current_user.karma_balance + active_value
     
     return PortfolioSummary(
         cash_balance=current_user.karma_balance,
-        invested_value=active_invested,      # Only active positions
-        positions_value=active_value,        # Only active positions
+        invested_value=active_invested,
+        positions_value=active_value,
         total_portfolio_value=total_portfolio_value,
-        total_pnl=total_pnl,                 # All-time P&L
+        total_pnl=total_pnl,
         total_pnl_percent=total_pnl_percent,
         active_positions_count=active_count,
         resolved_positions_count=resolved_count

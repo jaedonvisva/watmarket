@@ -80,6 +80,22 @@ class BetCreate(BaseModel):
     stake: int = Field(..., gt=0)
 
 
+class SellSharesRequest(BaseModel):
+    """Request to sell shares from a position."""
+    line_id: UUID
+    outcome: Literal["yes", "no"]
+    shares: float = Field(..., gt=0)
+
+
+class SellSharesResponse(BaseModel):
+    """Response after selling shares."""
+    shares_sold: float
+    amount_received: float  # GOOSE received
+    sell_price: float  # amount_received / shares_sold
+    new_balance: int
+    remaining_shares: float
+
+
 class BetResponse(BaseModel):
     id: UUID
     user_id: UUID
@@ -133,7 +149,7 @@ class TransactionResponse(BaseModel):
     id: UUID
     user_id: UUID
     amount: int
-    type: Literal["bet", "payout", "initial"]
+    type: Literal["bet", "payout", "initial", "sell"]
     reference_id: Optional[UUID]
     created_at: datetime
 
@@ -141,16 +157,18 @@ class TransactionResponse(BaseModel):
 
 
 class TradeHistoryItem(BaseModel):
-    """A single trade (bet) with full details including payout if resolved."""
-    id: UUID  # bet id
+    """A single trade (bet or sell) with details."""
+    id: UUID
     created_at: datetime
     line_id: UUID
     line_title: str
     outcome: Literal["yes", "no"]
+    type: Literal["buy", "sell"]
     shares: float
-    buy_price: float
-    cost: int  # stake (always positive)
-    # Resolution info
+    price: float
+    amount: float  # Cost for buy, Revenue for sell
+    
+    # Resolution info (mostly for buys)
     is_resolved: bool
     result: Optional[Literal["won", "lost"]] = None
     payout: Optional[float] = None  # Amount received if resolved

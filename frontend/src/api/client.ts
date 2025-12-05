@@ -84,9 +84,10 @@ export interface Trade {
   line_id: string;
   line_title: string;
   outcome: 'yes' | 'no';
+  type: 'buy' | 'sell';
   shares: number;
-  buy_price: number;
-  cost: number;
+  price: number;
+  amount: number;  // Cost for buy, Revenue for sell
   is_resolved: boolean;
   result: 'won' | 'lost' | null;
   payout: number | null;
@@ -126,6 +127,20 @@ export interface PriceHistoryPoint {
   created_at: string;
 }
 
+export interface SellSharesRequest {
+  line_id: string;
+  outcome: 'yes' | 'no';
+  shares: number;
+}
+
+export interface SellSharesResponse {
+  shares_sold: number;
+  amount_received: number;
+  sell_price: number;
+  new_balance: number;
+  remaining_shares: number;
+}
+
 export interface AuthResponse {
   access_token: string;
   token_type: string;
@@ -163,6 +178,9 @@ export const linesApi = {
 export const betsApi = {
   place: (line_id: string, outcome: 'yes' | 'no', stake: number) =>
     api.post<Bet>('/bets/place', { line_id, outcome, stake }),
+  
+  sell: (line_id: string, outcome: 'yes' | 'no', shares: number) =>
+    api.post<SellSharesResponse>('/bets/sell', { line_id, outcome, shares }),
   
   getMy: () => api.get<Bet[]>('/bets/my'),
   

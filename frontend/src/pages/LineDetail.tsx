@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Line, Bet, PriceHistoryPoint } from '../api/client';
 import { linesApi, betsApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import PriceChart from '../components/PriceChart';
 import LoadingSpinner from '../components/LoadingSpinner';
+
+type TradeMode = 'buy' | 'sell';
 
 export default function LineDetail() {
   const { id } = useParams<{ id: string }>();
@@ -18,12 +20,14 @@ export default function LineDetail() {
   const [error, setError] = useState('');
   const [now, setNow] = useState(new Date());
 
-  // Bet form
+  // Trade form
+  const [tradeMode, setTradeMode] = useState<TradeMode>('buy');
   const [outcome, setOutcome] = useState<'yes' | 'no'>('yes');
   const [stake, setStake] = useState(100);
   const [targetShares, setTargetShares] = useState(100);
+  const [sellShares, setSellShares] = useState(0);
   const [buyMode, setBuyMode] = useState<'amount' | 'shares'>('amount');
-  const [betting, setBetting] = useState(false);
+  const [trading, setTrading] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -54,6 +58,34 @@ export default function LineDetail() {
     }
   };
 
+  // Calculate user's position for the selected outcome
+  const userPosition = useMemo(() => {
+    const positionBets = myBets.filter(b => b.outcome === outcome && !b.payout);
+    const totalShares = positionBets.reduce((sum, b) => sum + (b.shares || 0), 0);
+    const totalCost = positionBets.reduce((sum, b) => sum + b.stake, 0);
+    return { totalShares, totalCost };
+  }, [myBets, outcome]);
+
+  // Calculate sell value using CPMM formula
+  const calculateSellValue = (shares: number, out: 'yes' | 'no') => {
+    if (!line || shares <= 0) return 0;
+    
+    const yes_pool = line.yes_pool;
+    const no_pool = line.no_pool;
+    
+    // Quadratic formula: c^2 - c(yes + s + no) + s*pool = 0
+    // where pool is no_pool for YES, yes_pool for NO
+    const a = 1;
+    const b = -(yes_pool + shares + no_pool);
+    const c_term = shares * (out === 'yes' ? no_pool : yes_pool);
+    
+    const discriminant = b * b - 4 * a * c_term;
+    if (discriminant < 0) return 0;
+    
+    const amount = (-b - Math.sqrt(discriminant)) / (2 * a);
+    return Math.max(0, amount);
+  };
+
   const handlePlaceBet = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!line || !user) return;
@@ -66,7 +98,7 @@ export default function LineDetail() {
       return;
     }
 
-    setBetting(true);
+    setTrading(true);
     setError('');
 
     try {
@@ -76,7 +108,31 @@ export default function LineDetail() {
       const errorMessage = err instanceof Error ? err.message : 'Order failed';
       setError(errorMessage);
     } finally {
-      setBetting(false);
+      setTrading(false);
+    }
+  };
+
+  const handleSellShares = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!line || !user || sellShares <= 0) return;
+
+    if (sellShares > userPosition.totalShares) {
+      setError(`Insufficient shares. You have: ${userPosition.totalShares.toFixed(2)}`);
+      return;
+    }
+
+    setTrading(true);
+    setError('');
+
+    try {
+      await betsApi.sell(line.id, outcome, sellShares);
+      await Promise.all([fetchData(), refreshUser()]);
+      setSellShares(0);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Sell failed';
+      setError(errorMessage);
+    } finally {
+      setTrading(false);
     }
   };
 
@@ -192,66 +248,143 @@ export default function LineDetail() {
 
         {isOpen && user ? (
           <>
-            <div className="input-tabs">
+            {/* Buy/Sell Mode Toggle */}
+            <div className="trade-mode-tabs">
               <button 
-                className={`tab-btn ${buyMode === 'amount' ? 'active' : ''}`}
-                onClick={() => setBuyMode('amount')}
+                className={`mode-tab ${tradeMode === 'buy' ? 'active buy' : ''}`}
+                onClick={() => setTradeMode('buy')}
               >
-                Amount ($G)
+                Buy
               </button>
               <button 
-                className={`tab-btn ${buyMode === 'shares' ? 'active' : ''}`}
-                onClick={() => setBuyMode('shares')}
+                className={`mode-tab ${tradeMode === 'sell' ? 'active sell' : ''}`}
+                onClick={() => setTradeMode('sell')}
+                disabled={userPosition.totalShares <= 0}
               >
-                Buy in Shares
+                Sell {userPosition.totalShares > 0 && `(${userPosition.totalShares.toFixed(1)})`}
               </button>
             </div>
 
-            <form onSubmit={handlePlaceBet}>
-              <div className="trade-input-container">
-                {buyMode === 'amount' && <div className="currency-prefix">GOOS</div>}
-                <input
-                  className="huge-input"
-                  type="number"
-                  min={1}
-                  max={buyMode === 'amount' ? user.karma_balance : undefined}
-                  value={buyMode === 'amount' ? stake : targetShares}
-                  onChange={(e) => buyMode === 'amount' ? setStake(Number(e.target.value)) : setTargetShares(Number(e.target.value))}
-                  placeholder="0"
-                />
-              </div>
+            {tradeMode === 'buy' ? (
+              <>
+                <div className="input-tabs">
+                  <button 
+                    className={`tab-btn ${buyMode === 'amount' ? 'active' : ''}`}
+                    onClick={() => setBuyMode('amount')}
+                  >
+                    Amount ($G)
+                  </button>
+                  <button 
+                    className={`tab-btn ${buyMode === 'shares' ? 'active' : ''}`}
+                    onClick={() => setBuyMode('shares')}
+                  >
+                    Buy in Shares
+                  </button>
+                </div>
 
-              <div className="order-summary-card">
-                 <div className="summary-row">
-                   <span className="summary-label">Avg Price</span>
-                   <span className="summary-val">GOOS {estPrice.toFixed(2)}</span>
-                 </div>
-                 <div className="summary-row">
-                   <span className="summary-label">Est Shares</span>
-                   <span className="summary-val">{estShares.toFixed(2)}</span>
-                 </div>
-                 <div className="summary-row">
-                   <span className="summary-label">Potential Return</span>
-                   <span className="summary-val">GOOS {estShares.toFixed(0)} ({estCost > 0 ? ((estShares / estCost - 1) * 100).toFixed(0) : 0}%)</span>
-                 </div>
-                 <div className="summary-row">
-                   <span className="summary-label">Total Cost</span>
-                   <span className="summary-val">GOOS {estCost.toFixed(2)}</span>
-                 </div>
-              </div>
+                <form onSubmit={handlePlaceBet}>
+                  <div className="trade-input-container">
+                    {buyMode === 'amount' && <div className="currency-prefix">GOOS</div>}
+                    <input
+                      className="huge-input"
+                      type="number"
+                      min={1}
+                      max={buyMode === 'amount' ? user.karma_balance : undefined}
+                      value={buyMode === 'amount' ? stake : targetShares}
+                      onChange={(e) => buyMode === 'amount' ? setStake(Number(e.target.value)) : setTargetShares(Number(e.target.value))}
+                      placeholder="0"
+                    />
+                  </div>
 
-              <button 
-                type="submit" 
-                disabled={betting || (buyMode === 'amount' ? stake > user.karma_balance : estCost > user.karma_balance) || estCost <= 0}
-                className={`action-btn ${outcome}`}
-              >
-                {betting ? 'Processing...' : 'Submit Order'}
-              </button>
-              
-              <div className="balance-hint">
-                Available: GOOS {user.karma_balance.toLocaleString()}
-              </div>
-            </form>
+                  <div className="order-summary-card">
+                     <div className="summary-row">
+                       <span className="summary-label">Avg Price</span>
+                       <span className="summary-val">GOOS {estPrice.toFixed(2)}</span>
+                     </div>
+                     <div className="summary-row">
+                       <span className="summary-label">Est Shares</span>
+                       <span className="summary-val">{estShares.toFixed(2)}</span>
+                     </div>
+                     <div className="summary-row">
+                       <span className="summary-label">Potential Return</span>
+                       <span className="summary-val">GOOS {estShares.toFixed(0)} ({estCost > 0 ? ((estShares / estCost - 1) * 100).toFixed(0) : 0}%)</span>
+                     </div>
+                     <div className="summary-row">
+                       <span className="summary-label">Total Cost</span>
+                       <span className="summary-val">GOOS {estCost.toFixed(2)}</span>
+                     </div>
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    disabled={trading || (buyMode === 'amount' ? stake > user.karma_balance : estCost > user.karma_balance) || estCost <= 0}
+                    className={`action-btn ${outcome}`}
+                  >
+                    {trading ? 'Processing...' : `Buy ${outcome.toUpperCase()}`}
+                  </button>
+                  
+                  <div className="balance-hint">
+                    Available: GOOS {user.karma_balance.toLocaleString()}
+                  </div>
+                </form>
+              </>
+            ) : (
+              <>
+                <form onSubmit={handleSellShares}>
+                  <div className="trade-input-container">
+                    <div className="currency-prefix">Shares</div>
+                    <input
+                      className="huge-input"
+                      type="number"
+                      min={0.01}
+                      max={userPosition.totalShares}
+                      step={0.01}
+                      value={sellShares || ''}
+                      onChange={(e) => setSellShares(Number(e.target.value))}
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div className="sell-quick-buttons">
+                    <button type="button" onClick={() => setSellShares(userPosition.totalShares * 0.25)}>25%</button>
+                    <button type="button" onClick={() => setSellShares(userPosition.totalShares * 0.5)}>50%</button>
+                    <button type="button" onClick={() => setSellShares(userPosition.totalShares * 0.75)}>75%</button>
+                    <button type="button" onClick={() => setSellShares(userPosition.totalShares)}>Max</button>
+                  </div>
+
+                  <div className="order-summary-card">
+                     <div className="summary-row">
+                       <span className="summary-label">Your Position</span>
+                       <span className="summary-val">{userPosition.totalShares.toFixed(2)} shares</span>
+                     </div>
+                     <div className="summary-row">
+                       <span className="summary-label">Selling</span>
+                       <span className="summary-val">{sellShares.toFixed(2)} shares</span>
+                     </div>
+                     <div className="summary-row">
+                       <span className="summary-label">Est. Sell Price</span>
+                       <span className="summary-val">GOOS {sellShares > 0 ? (calculateSellValue(sellShares, outcome) / sellShares).toFixed(2) : '0.00'}</span>
+                     </div>
+                     <div className="summary-row highlight">
+                       <span className="summary-label">You'll Receive</span>
+                       <span className="summary-val">GOOS {calculateSellValue(sellShares, outcome).toFixed(0)}</span>
+                     </div>
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    disabled={trading || sellShares <= 0 || sellShares > userPosition.totalShares}
+                    className={`action-btn sell`}
+                  >
+                    {trading ? 'Processing...' : `Sell ${outcome.toUpperCase()}`}
+                  </button>
+                  
+                  <div className="balance-hint">
+                    Position: {userPosition.totalShares.toFixed(2)} {outcome.toUpperCase()} shares
+                  </div>
+                </form>
+              </>
+            )}
           </>
         ) : (
           <div style={{textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem'}}>

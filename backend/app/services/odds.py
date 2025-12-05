@@ -62,6 +62,60 @@ def calculate_cpmm_buy(
         
         return shares_bought, new_yes_pool, new_no_pool
 
+def calculate_cpmm_sell(
+    shares: float,
+    outcome: str,
+    yes_pool: float,
+    no_pool: float
+) -> float:
+    """
+    Calculate amount received when selling shares. Inverse of calculate_cpmm_buy.
+    Solves: c^2 - c(yes + s + no) + s*no = 0 using quadratic formula.
+    """
+    if shares <= 0:
+        return 0.0
+    
+    if outcome == "yes":
+        b = -(yes_pool + shares + no_pool)
+        c_term = shares * no_pool
+    else:
+        b = -(no_pool + shares + yes_pool)
+        c_term = shares * yes_pool
+    
+    discriminant = b * b - 4 * c_term
+    if discriminant < 0:
+        return 0.0
+    
+    amount_received = (-b - (discriminant ** 0.5)) / 2
+    
+    return max(0, amount_received)
+
+
+def calculate_cpmm_sell_with_pools(
+    shares: float,
+    outcome: str,
+    yes_pool: float,
+    no_pool: float
+) -> Tuple[float, float, float]:
+    """Calculate amount received and new pool state when selling shares."""
+    if shares <= 0:
+        return 0.0, yes_pool, no_pool
+    
+    amount_received = calculate_cpmm_sell(shares, outcome, yes_pool, no_pool)
+    
+    if amount_received <= 0:
+        return 0.0, yes_pool, no_pool
+    
+    if outcome == "yes":
+        new_yes_pool = yes_pool + (shares - amount_received)
+        new_no_pool = no_pool - amount_received
+    else:
+        new_no_pool = no_pool + (shares - amount_received)
+        new_yes_pool = yes_pool - amount_received
+    
+    return amount_received, new_yes_pool, new_no_pool
+
+
 def calculate_potential_payout(shares: float) -> float:
     """
     Calculate potential payout. In CPMM with p=1 payout, it's just shares * 1.
