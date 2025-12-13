@@ -14,7 +14,7 @@ type SideFilter = 'all' | 'yes' | 'no';
 type TabType = 'positions' | 'history';
 
 export default function Portfolio() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('positions');
   const [groupByMarket, setGroupByMarket] = useState(false);
   const [resultFilter, setResultFilter] = useState<ResultFilter>('all');
@@ -24,7 +24,11 @@ export default function Portfolio() {
 
   const { data: portfolio, isLoading: loadingPortfolio } = useQuery({
     queryKey: ['portfolio'],
-    queryFn: async () => (await betsApi.getPortfolio()).data,
+    queryFn: async () => {
+      // Refresh user balance in navbar when portfolio loads
+      await refreshUser();
+      return (await betsApi.getPortfolio()).data;
+    },
     enabled: !!user,
     refetchInterval: 10000, // Refresh every 10s for live prices
   });

@@ -64,16 +64,10 @@ function Sidebar() {
           <span className="nav-label">Portfolio</span>
         </Link>
         {user.is_admin && (
-          <>
-            <Link to="/admin" className={`nav-item ${isActive('/admin')}`}>
-              <span className="icon">🛠️</span>
-              <span className="nav-label">Admin</span>
-            </Link>
-            <Link to="/lines/create" className={`nav-item ${isActive('/lines/create')}`}>
-              <span className="icon">⚡</span>
-              <span className="nav-label">Create Market</span>
-            </Link>
-          </>
+          <Link to="/admin" className={`nav-item ${isActive('/admin')}`}>
+            <span className="icon">🛠️</span>
+            <span className="nav-label">Admin</span>
+          </Link>
         )}
       </div>
 

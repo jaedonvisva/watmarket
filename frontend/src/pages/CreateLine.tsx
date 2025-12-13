@@ -60,71 +60,104 @@ export default function CreateLine() {
   const minDateTime = getMinDateTime();
 
   return (
-    <div className="create-line">
-      <button className="back-btn" onClick={() => navigate('/')}>
-        ← Back to Lines
-      </button>
-
-      <h1>Create Prediction Line</h1>
-
-      <form onSubmit={handleSubmit}>
-        {error && <div className="error">{error}</div>}
-
-        <div className="form-group">
-          <label htmlFor="title">Title *</label>
-          <input
-            id="title"
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Will X happen by Y date?"
-            required
-            maxLength={500}
-          />
+    <div className="create-line-page">
+      <div className="create-line-container">
+        <div className="create-line-header">
+          <button className="back-btn" onClick={() => navigate('/admin')}>
+            ← Back to Admin
+          </button>
+          <h1>Create New Market</h1>
+          <p className="subtitle">Set up a new prediction market for users to trade on</p>
         </div>
 
-        <div className="form-group">
-          <label htmlFor="description">Description</label>
-          <textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Additional context or rules for this prediction..."
-            rows={4}
-          />
-        </div>
+        <form onSubmit={handleSubmit} className="create-line-form">
+          {error && <div className="error-banner">{error}</div>}
 
-        <div className="form-group">
-          <label htmlFor="liquidity">Initial Liquidity (Pool Depth)</label>
-          <input
-            id="liquidity"
-            type="number"
-            value={initialLiquidity}
-            onChange={(e) => setInitialLiquidity(Number(e.target.value))}
-            min={1}
-            required
-          />
-          <small style={{color: 'var(--text-secondary)', display: 'block', marginTop: '0.25rem'}}>
-            Higher liquidity means less price impact per trade. Default is 100.
-          </small>
-        </div>
+          <div className="form-group">
+            <label htmlFor="title">
+              Market Question <span className="required">*</span>
+            </label>
+            <input
+              id="title"
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Will X happen by Y date?"
+              required
+              maxLength={500}
+              className="form-input"
+            />
+            <small className="form-hint">Ask a clear yes/no question</small>
+          </div>
 
-        <div className="form-group">
-          <label htmlFor="closesAt">Betting Closes At *</label>
-          <input
-            id="closesAt"
-            type="datetime-local"
-            value={closesAt}
-            onChange={(e) => setClosesAt(e.target.value)}
-            min={minDateTime}
-            required
-          />
-        </div>
+          <div className="form-group">
+            <label htmlFor="description">Description (Optional)</label>
+            <textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Add context, rules, or resolution criteria..."
+              rows={4}
+              className="form-input"
+            />
+            <small className="form-hint">Help users understand what they're betting on</small>
+          </div>
 
-        <button type="submit" disabled={loading} className="btn btn-primary">
-          {loading ? 'Creating...' : 'Create Line'}
-        </button>
-      </form>
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="liquidity">
+                Initial Liquidity <span className="required">*</span>
+              </label>
+              <input
+                id="liquidity"
+                type="number"
+                value={initialLiquidity}
+                onChange={(e) => setInitialLiquidity(Number(e.target.value))}
+                min={1}
+                required
+                className="form-input"
+              />
+              <small className="form-hint">
+                Pool depth (higher = less slippage)
+              </small>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="closesAt">
+                Closes At <span className="required">*</span>
+              </label>
+              <input
+                id="closesAt"
+                type="datetime-local"
+                value={closesAt}
+                onChange={(e) => setClosesAt(e.target.value)}
+                min={minDateTime}
+                required
+                className="form-input"
+              />
+              <small className="form-hint">When betting ends</small>
+            </div>
+          </div>
+
+          <div className="form-actions">
+            <button 
+              type="button" 
+              onClick={() => navigate('/admin')} 
+              className="btn btn-secondary"
+              disabled={loading}
+            >
+              Cancel
+            </button>
+            <button 
+              type="submit" 
+              disabled={loading} 
+              className="btn btn-primary"
+            >
+              {loading ? 'Creating Market...' : '✨ Create Market'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
