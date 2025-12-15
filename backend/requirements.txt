@@ -6,3 +6,6 @@ pydantic
 pydantic-settings
 python-jose[cryptography]
 pytest
+pytest-asyncio
+pytest-mock
+httpx

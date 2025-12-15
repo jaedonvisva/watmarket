@@ -148,7 +148,7 @@ export default function Dashboard() {
                       <Link to={`/lines/${trade.line_id}`}>{trade.line_title}</Link>
                     </td>
                     <td className={trade.outcome}>{trade.outcome.toUpperCase()}</td>
-                    <td>{trade.cost}</td>
+                    <td>{trade.amount.toFixed(0)}</td>
                     <td>
                       {trade.result 
                         ? (trade.result === 'won' ? `Won (+${trade.payout?.toFixed(0) || 0})` : 'Lost (0)')

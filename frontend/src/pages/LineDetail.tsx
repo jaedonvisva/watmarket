@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Line, Bet, PriceHistoryPoint } from '../api/client';
 import { linesApi, betsApi } from '../api/client';
@@ -34,19 +34,14 @@ export default function LineDetail() {
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    if (id) {
-      fetchData();
-    }
-  }, [id]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    if (!id) return;
     setLoading(true);
     try {
       const [lineRes, betsRes, historyRes] = await Promise.all([
-        linesApi.getOne(id!),
-        betsApi.getForLine(id!),
-        linesApi.getHistory(id!)
+        linesApi.getOne(id),
+        betsApi.getForLine(id),
+        linesApi.getHistory(id)
       ]);
       setLine(lineRes.data);
       setMyBets(betsRes.data);
@@ -56,7 +51,11 @@ export default function LineDetail() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   // Calculate user's position for the selected outcome
   const userPosition = useMemo(() => {
