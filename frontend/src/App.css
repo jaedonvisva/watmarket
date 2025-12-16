@@ -2291,13 +2291,19 @@ textarea.form-input {
 }
 
 .status-badge.open {
-  background: var(--gold-dim);
-  color: var(--gold);
+  background: var(--green-dim);
+  color: var(--green);
 }
 
 .status-badge.closed {
   background: var(--bg-hover);
   color: var(--text-secondary);
+}
+
+.status-badge.sold {
+  background: rgba(255, 215, 0, 0.08);
+  color: rgba(255, 215, 0, 0.75);
+  border: 1px solid rgba(255, 215, 0, 0.18);
 }
 
 .status-badge.won {
@@ -2536,6 +2542,219 @@ textarea.form-input {
 
 .amount-cell.positive {
   color: var(--green);
+}
+
+.amount-cell.negative {
+  color: var(--red);
+}
+
+/* Activity Feed */
+.activity-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.activity-row {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: all 0.15s ease;
+}
+
+.activity-row:hover {
+  border-color: var(--border-hover);
+}
+
+.activity-row.expanded {
+  border-color: var(--border-hover);
+  background: var(--bg-elevated);
+}
+
+.activity-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  gap: 1rem;
+}
+
+.activity-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.activity-action {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.action-type {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.action-type.buy {
+  color: var(--text-primary);
+}
+
+.action-type.sell {
+  color: var(--gold);
+}
+
+.action-shares {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.activity-market {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+}
+
+.activity-market:hover {
+  color: var(--text-secondary);
+  text-decoration: underline;
+}
+
+.activity-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.activity-outcome {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.125rem;
+}
+
+.activity-cashflow {
+  font-family: 'SF Mono', 'Monaco', monospace;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.activity-cashflow.positive {
+  color: var(--green);
+}
+
+.activity-cashflow.negative {
+  color: var(--red);
+}
+
+.activity-result {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.activity-result.open {
+  color: var(--text-muted);
+}
+
+.activity-result.won {
+  color: var(--green);
+}
+
+.activity-result.lost {
+  color: var(--red);
+}
+
+.expand-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 0.25rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s ease;
+}
+
+.expand-btn:hover {
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+}
+
+.activity-details {
+  padding: 0 1.25rem 1rem 1.25rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg-app);
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 1rem;
+  padding: 1rem 0;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detail-label {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.detail-value {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.detail-value.yes {
+  color: var(--green);
+}
+
+.detail-value.no {
+  color: var(--text-secondary);
+}
+
+.detail-value.won {
+  color: var(--green);
+}
+
+.detail-value.lost {
+  color: var(--red);
+}
+
+.view-market-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--gold);
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.5rem 0;
+}
+
+.view-market-btn:hover {
+  text-decoration: underline;
 }
 
 /* Result badge for sold */

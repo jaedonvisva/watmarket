@@ -12,7 +12,13 @@ app = FastAPI(
 # CORS middleware for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:50499",  # Windsurf browser preview
+    ],
+    allow_origin_regex=r"http://127\.0\.0\.1:\d+",  # Allow any localhost port for dev
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

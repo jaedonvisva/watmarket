@@ -6,6 +6,7 @@ import type { Position, Trade } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
+import ActivityFeed from '../components/ActivityFeed';
 import { TrendingUp, TrendingDown, Wallet, PieChart, Download, Layers, List, Filter, X, Search, DollarSign, BarChart3 } from 'lucide-react';
 
 type ResultFilter = 'all' | 'won' | 'lost' | 'open';
@@ -349,67 +350,7 @@ export default function Portfolio() {
           ) : groupByMarket ? (
             <GroupedTradesView trades={filteredTrades} positions={positions} formatDate={formatDate} />
           ) : (
-            <div className="history-table-wrapper">
-              <div className="table-legend">
-                <span className="legend-item"><span className="legend-dot negative"></span> Cash Out (Buy)</span>
-                <span className="legend-item"><span className="legend-dot positive"></span> Cash In (Sell/Payout)</span>
-              </div>
-              <table className="history-table">
-                <thead>
-                  <tr>
-                    <th>Market</th>
-                    <th>Type</th>
-                    <th>Side</th>
-                    <th>Shares</th>
-                    <th>Price</th>
-                    <th>Cash Flow</th>
-                    <th>Status</th>
-                    <th>Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredTrades.map((trade: Trade) => {
-                    const isClosed = trade.type === 'sell' || trade.result !== null;
-                    return (
-                      <tr key={trade.id} className={`${trade.result ? `result-${trade.result}` : ''} ${trade.type === 'sell' ? 'trade-sell' : ''} ${isClosed ? 'trade-closed' : ''}`}>
-                        <td className="market-cell">
-                          <Link to={`/lines/${trade.line_id}`} className="market-link">
-                            {trade.line_title}
-                          </Link>
-                        </td>
-                        <td>
-                          <span className={`type-badge ${trade.type}`}>
-                            {trade.type.toUpperCase()}
-                          </span>
-                        </td>
-                        <td>
-                          <span className={`side-badge ${trade.outcome}`}>
-                            {trade.outcome.toUpperCase()}
-                          </span>
-                        </td>
-                        <td className="shares-cell">{trade.shares.toFixed(2)}</td>
-                        <td className="price-cell">{trade.price.toFixed(2)}</td>
-                        <td className={`amount-cell ${trade.type === 'sell' ? 'positive' : 'negative'}`}>
-                          {trade.type === 'sell' ? '+' : '-'}{trade.amount.toLocaleString()}
-                        </td>
-                        <td>
-                          {trade.type === 'sell' ? (
-                            <span className="status-badge closed">Closed</span>
-                          ) : trade.result ? (
-                            <span className={`status-badge ${trade.result}`}>
-                              {trade.result === 'won' ? `Won +${trade.payout?.toFixed(0) || 0}` : 'Lost'}
-                            </span>
-                          ) : (
-                            <span className="status-badge open">Open</span>
-                          )}
-                        </td>
-                        <td className="date-cell">{formatDate(trade.created_at)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <ActivityFeed trades={filteredTrades} formatDate={formatDate} />
           )}
         </div>
       )}
@@ -630,7 +571,7 @@ function GroupedTradesView({ trades, positions, formatDate }: GroupedTradesViewP
                     </td>
                     <td>
                       {trade.type === 'sell' ? (
-                        <span className="status-badge closed">Closed</span>
+                        <span className="status-badge sold">Sold</span>
                       ) : trade.result ? (
                         <span className={`status-badge ${trade.result}`}>
                           {trade.result === 'won' ? `Won +${trade.payout?.toFixed(0) || 0}` : 'Lost'}

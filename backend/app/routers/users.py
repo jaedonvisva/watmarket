@@ -145,14 +145,28 @@ async def get_my_trades(current_user: UserResponse = Depends(get_current_user)):
         .eq("type", "sell")\
         .order("created_at", desc=True)\
         .execute()
+
+    sell_line_ids = [str(tx["reference_id"]) for tx in sells_result.data if tx.get("reference_id")]
+    unique_sell_line_ids = list(dict.fromkeys(sell_line_ids))
+    sell_line_titles: dict[str, str] = {}
+    if unique_sell_line_ids:
+        lines_result = admin_client.table("lines")\
+            .select("id, title")\
+            .in_("id", unique_sell_line_ids)\
+            .execute()
+        sell_line_titles = {str(line["id"]): line.get("title") for line in (lines_result.data or []) if line.get("id")}
     
     for tx in sells_result.data:
         metadata = tx.get("metadata") or {}
+        reference_id = tx.get("reference_id")
+        line_title = sell_line_titles.get(str(reference_id)) if reference_id else None
+        if not line_title:
+            line_title = metadata.get("line_title")
         trades.append(TradeHistoryItem(
             id=tx["id"],
             created_at=tx["created_at"],
             line_id=tx["reference_id"],
-            line_title=metadata.get("line_title", "Unknown"),
+            line_title=line_title or "Unknown",
             outcome=metadata.get("outcome", "yes"),
             type="sell",
             shares=metadata.get("shares", 0),

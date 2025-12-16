@@ -298,8 +298,12 @@ export default function LineDetail() {
                        <span className="summary-val">{estShares.toFixed(2)}</span>
                      </div>
                      <div className="summary-row">
-                       <span className="summary-label">Potential Return</span>
-                       <span className="summary-val">GOOS {estShares.toFixed(0)} ({estCost > 0 ? ((estShares / estCost - 1) * 100).toFixed(0) : 0}%)</span>
+                       <span className="summary-label">Payout if {outcome.toUpperCase()} wins</span>
+                       <span className="summary-val">GOOS {estShares.toFixed(0)}</span>
+                     </div>
+                     <div className="summary-row">
+                       <span className="summary-label">Est. profit if wins</span>
+                       <span className="summary-val">GOOS {(estShares - estCost).toFixed(0)} ({estCost > 0 ? (((estShares - estCost) / estCost) * 100).toFixed(0) : 0}%)</span>
                      </div>
                      <div className="summary-row">
                        <span className="summary-label">Total Cost</span>
