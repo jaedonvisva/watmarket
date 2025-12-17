@@ -1,94 +1,199 @@
-# WatMarket - University Prediction Market
+# WatMarket
 
-A university-specific prediction market platform where users trade GOOS (virtual points) on yes/no outcomes.
+WatMarket is a university-focused prediction market where users trade **GOOS** (virtual points) on **binary (YES/NO)** outcomes.
+
+The core goal of the project is to model real prediction-market dynamics (pricing, slippage, and position liquidation) while staying in a **play-money** environment.
 
 ## Stack
 
-- **Backend**: Python FastAPI
-- **Database**: Supabase (Postgres + Auth + RLS)
 - **Frontend**: React + TypeScript + Vite
+- **Backend**: Python + FastAPI
+- **Database**: Supabase (Postgres + Auth + Row Level Security)
 
-## Features
+## High-level flow
 
-- User registration with Supabase Auth
-- Starting GOOS balance (1,000)
-- **CPMM (Constant Product Market Maker) Trading Model** (Polymarket-style)
-- Buy YES/NO shares with dynamic pricing
-- Admin resolution with share redemption (1 Share = 1 GOOS)
-- Transaction history & Portfolio tracking
+- **Auth**: Users register/login via Supabase Auth; the frontend stores the returned access token and sends it as a Bearer token.
+- **Markets**: Admins create markets (“lines”) with an initial CPMM liquidity seed.
+- **Trading**:
+  - Users buy YES/NO shares by spending GOOS.
+  - Prices update automatically based on pool balances.
+  - Users can sell shares back into the pool before resolution.
+- **Resolution**: Admin resolves a market to YES or NO; winning shares pay out.
+- **Portfolio**: The app shows positions and portfolio summary with consistent liquidation semantics.
 
----
+## Repository layout
 
-## Database Schema
+- `frontend/`: React app
+- `backend/`: FastAPI app
+- `AUDIT_REPORT.md`: security/performance review and database migration guidance
+- `ROADMAP.md`: planned features
 
-### Tables
+## Local development
 
-| Table | Description |
-|-------|-------------|
-| `users` | User profiles with GOOS balance |
-| `lines` | Prediction lines with AMM pools (`yes_pool`, `no_pool`) |
-| `bets` | User positions (`shares`, `avg_price`, `outcome`) |
-| `transactions` | GOOS ledger (buy, payout, initial) |
-| `price_history` | Historical prices for charting |
+### Prerequisites
 
-### RLS Policies
+- Node.js + npm
+- Python 3
+- A Supabase project (URL + keys)
 
-- Users can only view their own bets and transactions
-- Only admins can create/resolve lines
-- Users can only place bets if authenticated
+### Backend (FastAPI)
 
----
+From `backend/`:
 
-## Market Mechanics (CPMM)
+1. Create and activate a virtual environment.
+2. Install dependencies.
+3. Create `backend/.env`:
 
-WatMarket uses a **Constant Product Market Maker (CPMM)** model, similar to Polymarket or Uniswap, to price outcome shares.
+   - `SUPABASE_URL=...`
+   - `SUPABASE_ANON_KEY=...`
+   - `SUPABASE_SERVICE_ROLE_KEY=...`
 
-### Pricing
-The price of an outcome is determined by the ratio of assets in the pool.
-Invariant: `k = yes_pool * no_pool`
+4. Run the API server.
+
+The API serves Swagger docs at `/docs`.
+
+### Frontend (React)
+
+From `frontend/`:
+
+1. Install dependencies.
+2. Create `frontend/.env`:
+
+   - `VITE_API_URL=http://localhost:8000`
+
+3. Start the dev server.
+
+## Database schema (conceptual)
+
+Primary tables used by the app:
+
+- **`users`**: profile + `karma_balance` (GOOS cash)
+- **`lines`**: market metadata + pool state (`yes_pool`, `no_pool`), plus `resolved` and `correct_outcome`
+- **`bets`**: buy trades (stake, shares, outcome, payout)
+- **`transactions`**: ledger events (including sells)
+- **`price_history`**: historical implied prices
+
+Row Level Security (RLS) is used so that users can only see their own private records.
+
+## Market mechanics (CPMM)
+
+WatMarket uses a **Constant Product Market Maker (CPMM)** for binary markets.
+
+### Pools and invariant
+
+Each market has two pools:
+
+- `yes_pool`
+- `no_pool`
+
+The CPMM invariant is:
+
+`k = yes_pool * no_pool`
+
+### Implied probability / price
+
+The app uses pool ratios to compute implied prices:
 
 ```
 Price(YES) = no_pool / (yes_pool + no_pool)
 Price(NO)  = yes_pool / (yes_pool + no_pool)
 ```
 
-### Buying Shares
-When you spend GOOS to buy YES shares:
-1.  Your investment effectively adds liquidity to the **NO** pool (pushing the price of NO down and YES up).
-2.  You receive YES shares from the pool based on the curve `x * y = k`.
-3.  **Slippage**: Larger trades move the price more, resulting in a higher average cost per share.
+These are shown as percentages in the UI.
 
-### Payout Logic
-When a market is resolved:
-1.  **Winning Shares** are redeemable for **1.0 GOOS** each.
-2.  **Losing Shares** become worthless (0 payout).
+### Buying shares
 
-**Example:**
-- You buy 100 YES shares at an average price of 0.60 (Cost: 60 GOOS).
-- **If YES wins**: You receive 100 GOOS. (Profit: +40).
-- **If NO wins**: You receive 0. (Loss: -60).
+When a user spends `I` GOOS to buy an outcome, the pool moves along the `x*y=k` curve.
 
----
+Let `k = yes_pool * no_pool`.
 
-## 🔬 Security & Performance Audit
+Buying YES with investment `I`:
 
-A comprehensive deep health check was performed on November 30, 2025. See **[AUDIT_REPORT.md](./AUDIT_REPORT.md)** for full details.
+```
+new_no  = no_pool + I
+new_yes = k / new_no
 
-### Quick Summary
+shares_bought = I + (yes_pool - new_yes)
+```
 
-**Overall Health:** 7.5/10 🟡
+Buying NO is symmetric.
 
-**Critical Issues Found:**
-- 🔴 Race conditions in bet placement (no transaction atomicity)
-- 🔴 Float precision errors in financial calculations
-- 🔴 Missing constraints on negative balances and zero pools
-- 🔴 Payout rounding causes monetary loss
-- 🔴 Security vulnerability in database function
+### Selling shares (buy-opposite method)
 
-**Status:** Ready for development, requires fixes before production deployment.
+WatMarket values sells using a symmetry trick (commonly used in production CPMMs):
 
-See the audit report for:
-- 26 detailed findings (6 critical, 12 warnings, 8 optimizations)
-- Complete migration scripts
-- Testing checklist
-- Priority roadmap
+To sell `S` shares of YES:
+
+1. Compute the **cost to buy `S` shares of NO** at current pools.
+2. Redeem the combined YES+NO bundle at `1` per share.
+
+So:
+
+```
+sell_value(S, YES) = S - cost_to_buy_shares(S, NO)
+sell_value(S, NO)  = S - cost_to_buy_shares(S, YES)
+```
+
+The **cost_to_buy_shares** is solved from the CPMM equations (quadratic), and this “buy-opposite” structure guarantees buy/sell symmetry.
+
+### Resolution and payout
+
+Markets resolve to either YES or NO.
+
+- Winning shares pay **1 GOOS per share**.
+- Losing shares pay 0.
+
+Example:
+
+- Buy 100 YES shares for 60 GOOS total.
+- If YES wins: payout = 100 GOOS (profit +40).
+- If NO wins: payout = 0 (loss -60).
+
+## Portfolio and P&L accounting
+
+The app uses a single definition of “value” everywhere:
+
+> **Position value = CPMM liquidation value** (what you would receive if you sold now)
+
+### Positions endpoint
+
+Positions are aggregated by `(line_id, outcome)`:
+
+- `total_cost` = sum of stakes
+- `total_shares` = sum of shares
+- For open markets: `current_value = calculate_cpmm_sell(total_shares, ...)`
+- For resolved markets: `current_value = sum(payout)`
+
+### Portfolio summary endpoint
+
+Portfolio summary now matches the same aggregation semantics as positions:
+
+- Aggregate by `(line_id, outcome)`
+- Compute liquidation value once per aggregated position
+- Sum those values
+
+Returned metrics:
+
+- `cash_balance` = current GOOS cash (`users.karma_balance`)
+- `invested_value` = cost basis of active positions
+- `positions_value` = liquidation value of active positions
+- `total_portfolio_value = cash_balance + positions_value`
+- `total_pnl = total_returned - total_invested` (includes resolved + open)
+
+## API overview
+
+Key endpoints:
+
+- `POST /users/register`, `POST /users/login`, `GET /users/me`
+- `GET /lines`, `GET /lines/{id}`, `POST /lines` (admin), `POST /lines/{id}/resolve` (admin)
+- `POST /bets/place`, `POST /bets/sell`
+- `GET /bets/positions`, `GET /bets/portfolio`
+
+## Security / audit notes
+
+See `AUDIT_REPORT.md` for a detailed review of:
+
+- database constraints and RLS
+- atomic trading functions
+- precision concerns (float vs numeric)
+- recommended migrations and hardening steps
