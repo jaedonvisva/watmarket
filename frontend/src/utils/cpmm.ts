@@ -55,7 +55,14 @@ export function calculateCostForShares(
 }
 
 /**
- * Calculate value received when selling shares
+ * Calculate value received when selling shares.
+ * 
+ * Uses "buy opposite outcome" approach (matches Manifold's internal logic):
+ * - Selling YES shares = buy the same number of NO shares, then combine
+ * - The cost to buy opposite shares is what you "pay" to exit
+ * - You receive: shares - cost_to_buy_opposite
+ * 
+ * This guarantees buy/sell symmetry and eliminates subtle algebra bugs.
  */
 export function calculateSellValue(
   pool: PoolState,
@@ -64,18 +71,17 @@ export function calculateSellValue(
 ): number {
   if (shares <= 0) return 0;
   
-  const { yes_pool, no_pool } = pool;
+  // To sell `shares` of `outcome`, compute cost to buy `shares` of opposite outcome
+  const oppositeOutcome = outcome === 'yes' ? 'no' : 'yes';
+  const costToBuyOpposite = calculateCostForShares(pool, shares, oppositeOutcome);
   
-  // Quadratic formula: c^2 - c(yes + s + no) + s*pool = 0
-  const a = 1;
-  const b = -(yes_pool + shares + no_pool);
-  const c_term = shares * (outcome === 'yes' ? no_pool : yes_pool);
+  // When you combine shares of YES + NO, they redeem for 1 each
+  // So selling S shares of YES means: buy S shares of NO for cost C,
+  // then combine S YES + S NO = S currency units
+  // Net received = S - C
+  const amountReceived = shares - costToBuyOpposite;
   
-  const discriminant = b * b - 4 * a * c_term;
-  if (discriminant < 0) return 0;
-  
-  const amount = (-b - Math.sqrt(discriminant)) / (2 * a);
-  return Math.max(0, amount);
+  return Math.max(0, amountReceived);
 }
 
 /**

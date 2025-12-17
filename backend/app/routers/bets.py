@@ -313,9 +313,13 @@ async def get_portfolio_summary(
     """
     Get overall portfolio summary with P&L calculations.
     
+    Aggregates bets by (line_id, outcome) FIRST, then computes liquidation value
+    once per position. This matches /bets/positions semantics and ensures
+    consistent valuation across the app.
+    
     Key distinction:
-    - Active positions: value is based on current market price (unrealized)
-    - Resolved positions: payout already added to cash balance, so we only track for P&L history
+    - Active positions: value is CPMM liquidation value (what you'd get if you sold now)
+    - Resolved positions: payout already added to cash balance, tracked for P&L history
     """
     admin_client = get_supabase_admin()
     
@@ -325,50 +329,64 @@ async def get_portfolio_summary(
         .eq("user_id", str(current_user.id))\
         .execute()
     
-    # Track active positions only for current value
-    active_invested = 0  # Cost basis of active positions
-    active_value = 0     # Current market value of active positions
-    
-    # Track all-time P&L (including resolved)
-    total_invested = 0   # All-time cost basis
-    total_returned = 0   # All-time value (payouts + current value)
-    
-    active_count = 0
-    resolved_count = 0
-    seen_positions = set()
+    # Step 1: Aggregate bets into positions by (line_id, outcome)
+    positions_map = {}
     
     for bet in result.data:
         line = bet.get("lines", {})
         if not line:
             continue
         
-        shares = bet.get("shares") or 0
-        stake = bet["stake"]
-        is_resolved = line["resolved"]
-        position_key = (bet["line_id"], bet["outcome"])
+        key = (bet["line_id"], bet["outcome"])
         
-        total_invested += stake
+        if key not in positions_map:
+            positions_map[key] = {
+                "line": line,
+                "outcome": bet["outcome"],
+                "total_shares": 0,
+                "total_cost": 0,
+                "total_payout": 0,
+            }
+        
+        shares = bet.get("shares") or 0
+        positions_map[key]["total_shares"] += shares
+        positions_map[key]["total_cost"] += bet["stake"]
+        
+        if bet.get("payout") is not None:
+            positions_map[key]["total_payout"] += bet["payout"]
+    
+    # Step 2: Compute metrics from aggregated positions
+    active_invested = 0
+    active_value = 0
+    total_invested = 0
+    total_returned = 0
+    active_count = 0
+    resolved_count = 0
+    
+    for key, pos in positions_map.items():
+        line = pos["line"]
+        is_resolved = line["resolved"]
+        total_shares = pos["total_shares"]
+        total_cost = pos["total_cost"]
+        
+        total_invested += total_cost
         
         if is_resolved:
-            payout = bet.get("payout") or 0
-            total_returned += payout
+            # Use actual payout for resolved positions
+            total_returned += pos["total_payout"]
+            resolved_count += 1
         else:
-            active_invested += stake
+            # Compute liquidation value ONCE for the entire aggregated position
             position_value = calculate_cpmm_sell(
-                shares,
-                bet["outcome"],
+                total_shares,
+                pos["outcome"],
                 line["yes_pool"],
                 line["no_pool"]
             )
+            active_invested += total_cost
             active_value += position_value
             total_returned += position_value
-        
-        if position_key not in seen_positions:
-            seen_positions.add(position_key)
-            if is_resolved:
-                resolved_count += 1
-            else:
-                active_count += 1
+            active_count += 1
     
     total_pnl = total_returned - total_invested
     total_pnl_percent = (total_pnl / total_invested * 100) if total_invested > 0 else 0

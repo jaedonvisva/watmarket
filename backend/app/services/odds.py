@@ -62,6 +62,40 @@ def calculate_cpmm_buy(
         
         return shares_bought, new_yes_pool, new_no_pool
 
+def _calculate_cost_to_buy_shares(
+    shares: float,
+    outcome: str,
+    yes_pool: float,
+    no_pool: float
+) -> float:
+    """
+    Calculate cost required to buy a specific number of shares.
+    Uses quadratic formula derived from CPMM invariant.
+    
+    Given: shares = investment + (pool_outcome - new_pool_outcome)
+    Where: new_pool_outcome = k / (pool_opposite + investment)
+    Solving for investment gives a quadratic.
+    """
+    if shares <= 0:
+        return 0.0
+    
+    if outcome == "yes":
+        Y, N = yes_pool, no_pool
+    else:
+        Y, N = no_pool, yes_pool
+    
+    # Quadratic: I^2 + I(Y + N - S) - S*N = 0
+    a = 1
+    b = Y + N - shares
+    c = -shares * N
+    
+    discriminant = b * b - 4 * a * c
+    if discriminant < 0:
+        return 0.0
+    
+    return (-b + (discriminant ** 0.5)) / (2 * a)
+
+
 def calculate_cpmm_sell(
     shares: float,
     outcome: str,
@@ -69,24 +103,29 @@ def calculate_cpmm_sell(
     no_pool: float
 ) -> float:
     """
-    Calculate amount received when selling shares. Inverse of calculate_cpmm_buy.
-    Solves: c^2 - c(yes + s + no) + s*no = 0 using quadratic formula.
+    Calculate amount received when selling shares.
+    
+    Uses "buy opposite outcome" approach (matches Manifold's internal logic):
+    - Selling YES shares = buy the same number of NO shares, then combine
+    - The cost to buy opposite shares is what you "pay" to exit
+    - You receive: shares - cost_to_buy_opposite
+    
+    This guarantees buy/sell symmetry and eliminates subtle algebra bugs.
     """
     if shares <= 0:
         return 0.0
     
-    if outcome == "yes":
-        b = -(yes_pool + shares + no_pool)
-        c_term = shares * no_pool
-    else:
-        b = -(no_pool + shares + yes_pool)
-        c_term = shares * yes_pool
+    # To sell `shares` of `outcome`, compute cost to buy `shares` of opposite outcome
+    opposite_outcome = "no" if outcome == "yes" else "yes"
+    cost_to_buy_opposite = _calculate_cost_to_buy_shares(
+        shares, opposite_outcome, yes_pool, no_pool
+    )
     
-    discriminant = b * b - 4 * c_term
-    if discriminant < 0:
-        return 0.0
-    
-    amount_received = (-b - (discriminant ** 0.5)) / 2
+    # When you combine shares of YES + NO, they redeem for 1 each
+    # So selling S shares of YES means: buy S shares of NO for cost C,
+    # then combine S YES + S NO = S currency units
+    # Net received = S - C
+    amount_received = shares - cost_to_buy_opposite
     
     return max(0, amount_received)
 
