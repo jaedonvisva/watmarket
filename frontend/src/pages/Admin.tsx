@@ -115,9 +115,14 @@ export default function Admin() {
     <div className="admin-page">
       <div className="page-header">
         <h1>Admin Dashboard</h1>
-        <Link to="/markets/create" className="btn btn-primary">
-          + Create Market
-        </Link>
+        <div className="header-actions">
+          <Link to="/admin/suggestions" className="btn btn-secondary">
+            Review Suggestions
+          </Link>
+          <Link to="/markets/create" className="btn btn-primary">
+            + Create Market
+          </Link>
+        </div>
       </div>
 
       <div className="admin-stats">

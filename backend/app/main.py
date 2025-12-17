@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import users, lines, bets
+from app.routers import users, lines, bets, suggestions
 
 app = FastAPI(
     title="WatMarket Prediction Market API",
@@ -28,6 +28,7 @@ app.add_middleware(
 app.include_router(users.router)
 app.include_router(lines.router)
 app.include_router(bets.router)
+app.include_router(suggestions.router)
 
 
 @app.get("/")

@@ -195,3 +195,33 @@ class PriceHistoryPoint(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ============ Suggested Line Schemas ============
+
+class SuggestedLineCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=500)
+    description: Optional[str] = None
+    closes_at: datetime
+
+
+class SuggestedLineResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    title: str
+    description: Optional[str]
+    closes_at: datetime
+    status: Literal["pending", "approved", "rejected"]
+    rejection_reason: Optional[str]
+    reviewed_by: Optional[UUID]
+    reviewed_at: Optional[datetime]
+    approved_line_id: Optional[UUID]
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SuggestedLineReview(BaseModel):
+    action: Literal["approve", "reject"]
+    rejection_reason: Optional[str] = None
+    initial_liquidity: float = 100.0

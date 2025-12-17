@@ -10,6 +10,9 @@ import type {
   PriceHistoryPoint,
   SellSharesResponse,
   AuthResponse,
+  SuggestedLine,
+  SuggestedLineCreateRequest,
+  SuggestionReviewRequest,
 } from './types';
 
 // Re-export all types for backwards compatibility
@@ -90,4 +93,21 @@ export const betsApi = {
   getPositions: () => api.get<Position[]>('/bets/positions'),
   
   getPortfolio: () => api.get<PortfolioSummary>('/bets/portfolio'),
+};
+
+export const suggestionsApi = {
+  create: (data: SuggestedLineCreateRequest) =>
+    api.post<SuggestedLine>('/suggestions', data),
+  
+  getMy: () => api.get<SuggestedLine[]>('/suggestions/my'),
+  
+  getPending: () => api.get<SuggestedLine[]>('/suggestions/pending'),
+  
+  getAll: (status?: string) =>
+    api.get<SuggestedLine[]>('/suggestions/all', { params: status ? { status_filter: status } : {} }),
+  
+  getOne: (id: string) => api.get<SuggestedLine>(`/suggestions/${id}`),
+  
+  review: (id: string, data: SuggestionReviewRequest) =>
+    api.post<SuggestedLine>(`/suggestions/${id}/review`, data),
 };

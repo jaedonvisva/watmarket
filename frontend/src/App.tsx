@@ -16,6 +16,9 @@ import CreateLine from './pages/CreateLine';
 import Portfolio from './pages/Portfolio';
 import Dashboard from './pages/Dashboard';
 import Admin from './pages/Admin';
+import AdminSuggestions from './pages/AdminSuggestions';
+import SuggestLine from './pages/SuggestLine';
+import MySuggestions from './pages/MySuggestions';
 import LoadingSpinner from './components/LoadingSpinner';
 import './App.css';
 
@@ -61,6 +64,9 @@ function Sidebar() {
         </Link>
         <Link to="/portfolio" className={`nav-item ${isActive('/portfolio')}`}>
           <span className="nav-label">Portfolio</span>
+        </Link>
+        <Link to="/suggestions/my" className={`nav-item ${isActive('/suggestions/my')}`}>
+          <span className="nav-label">My Suggestions</span>
         </Link>
         {user.is_admin && (
           <Link to="/admin" className={`nav-item ${isActive('/admin')}`}>
@@ -124,8 +130,11 @@ function AppRoutes() {
         <Route path="/markets/:id" element={<Layout><LineDetail /></Layout>} />
         <Route path="/lines/:id" element={<Layout><LineDetail /></Layout>} />
         <Route path="/markets/create" element={<Layout><CreateLine /></Layout>} />
+        <Route path="/markets/suggest" element={<Layout><SuggestLine /></Layout>} />
+        <Route path="/suggestions/my" element={<Layout><MySuggestions /></Layout>} />
         <Route path="/portfolio" element={<Layout><Portfolio /></Layout>} />
         <Route path="/admin" element={<Layout><Admin /></Layout>} />
+        <Route path="/admin/suggestions" element={<Layout><AdminSuggestions /></Layout>} />
       </Routes>
     </BrowserRouter>
   );

@@ -141,3 +141,33 @@ export interface PortfolioSummary {
   active_positions_count: number;
   resolved_positions_count: number;
 }
+
+// ============ Suggestion Types ============
+
+export type SuggestionStatus = 'pending' | 'approved' | 'rejected';
+
+export interface SuggestedLine {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  closes_at: string;
+  status: SuggestionStatus;
+  rejection_reason: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  approved_line_id: string | null;
+  created_at: string;
+}
+
+export interface SuggestedLineCreateRequest {
+  title: string;
+  description?: string;
+  closes_at: string;
+}
+
+export interface SuggestionReviewRequest {
+  action: 'approve' | 'reject';
+  rejection_reason?: string;
+  initial_liquidity?: number;
+}
