@@ -1,8 +1,5 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from supabase import Client
-from typing import Optional
-from uuid import UUID
 
 from app.database import get_supabase_client, get_supabase_admin
 from app.models.schemas import UserResponse

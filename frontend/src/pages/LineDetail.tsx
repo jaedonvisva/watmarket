@@ -1,61 +1,65 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import type { Line, Bet, PriceHistoryPoint } from '../api/client';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { linesApi, betsApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../components/Toast';
 import PriceChart from '../components/PriceChart';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { formatDateFull } from '../utils/formatters';
+import { useCurrentTime } from '../hooks/useCurrentTime';
+import { isMarketOpen } from '../utils/market';
+import { calculateEstimatedShares, calculateCostForShares, calculateSellValue } from '../utils/cpmm';
+import { ChevronDown, ChevronUp } from 'lucide-react';
+import { REFETCH_INTERVALS, DEFAULTS } from '../constants';
 
 type TradeMode = 'buy' | 'sell';
 
 export default function LineDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user, refreshUser } = useAuth();
+  const toast = useToast();
+  const now = useCurrentTime();
 
-  const [line, setLine] = useState<Line | null>(null);
-  const [history, setHistory] = useState<PriceHistoryPoint[]>([]);
-  const [myBets, setMyBets] = useState<Bet[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [now, setNow] = useState(new Date());
-
-  // Trade form
+  // Trade form state
   const [tradeMode, setTradeMode] = useState<TradeMode>('buy');
   const [outcome, setOutcome] = useState<'yes' | 'no'>('yes');
-  const [stake, setStake] = useState(100);
-  const [targetShares, setTargetShares] = useState(100);
+  const [stake, setStake] = useState<number>(DEFAULTS.INITIAL_STAKE);
+  const [targetShares, setTargetShares] = useState<number>(DEFAULTS.INITIAL_SHARES);
   const [sellShares, setSellShares] = useState(0);
   const [buyMode, setBuyMode] = useState<'amount' | 'shares'>('amount');
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [trading, setTrading] = useState(false);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  const { data: line, isLoading: loadingLine } = useQuery({
+    queryKey: ['line', id],
+    queryFn: async () => (await linesApi.getOne(id!)).data,
+    enabled: !!id,
+    refetchInterval: REFETCH_INTERVALS.MARKET_DATA,
+  });
 
-  const fetchData = useCallback(async () => {
-    if (!id) return;
-    setLoading(true);
-    try {
-      const [lineRes, betsRes, historyRes] = await Promise.all([
-        linesApi.getOne(id),
-        betsApi.getForLine(id),
-        linesApi.getHistory(id)
-      ]);
-      setLine(lineRes.data);
-      setMyBets(betsRes.data);
-      setHistory(historyRes.data);
-    } catch {
-      setError('Failed to load market data');
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+  const { data: history = [] } = useQuery({
+    queryKey: ['line-history', id],
+    queryFn: async () => (await linesApi.getHistory(id!)).data,
+    enabled: !!id,
+  });
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const { data: myBets = [] } = useQuery({
+    queryKey: ['line-bets', id],
+    queryFn: async () => (await betsApi.getForLine(id!)).data,
+    enabled: !!id && !!user,
+  });
+
+  const refetchData = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['line', id] }),
+      queryClient.invalidateQueries({ queryKey: ['line-bets', id] }),
+      refreshUser(),
+    ]);
+  };
 
   // Calculate user's position for the selected outcome
   const userPosition = useMemo(() => {
@@ -65,32 +69,16 @@ export default function LineDetail() {
     return { totalShares, totalCost };
   }, [myBets, outcome]);
 
-  // Calculate sell value using CPMM formula
-  const calculateSellValue = (shares: number, out: 'yes' | 'no') => {
+  const getSellValue = (shares: number, out: 'yes' | 'no') => {
     if (!line || shares <= 0) return 0;
-    
-    const yes_pool = line.yes_pool;
-    const no_pool = line.no_pool;
-    
-    // Quadratic formula: c^2 - c(yes + s + no) + s*pool = 0
-    // where pool is no_pool for YES, yes_pool for NO
-    const a = 1;
-    const b = -(yes_pool + shares + no_pool);
-    const c_term = shares * (out === 'yes' ? no_pool : yes_pool);
-    
-    const discriminant = b * b - 4 * a * c_term;
-    if (discriminant < 0) return 0;
-    
-    const amount = (-b - Math.sqrt(discriminant)) / (2 * a);
-    return Math.max(0, amount);
+    return calculateSellValue({ yes_pool: line.yes_pool, no_pool: line.no_pool }, shares, out);
   };
 
   const handlePlaceBet = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!line || !user) return;
 
-    // Calculate actual stake to send
-    const finalStake = buyMode === 'amount' ? stake : Math.ceil(calculateCostForShares(targetShares, outcome));
+    const finalStake = buyMode === 'amount' ? stake : Math.ceil(getEstCost);
 
     if (finalStake > user.karma_balance) {
       setError(`Insufficient GOOS. Available: ${user.karma_balance}`);
@@ -102,10 +90,13 @@ export default function LineDetail() {
 
     try {
       await betsApi.place(line.id, outcome, finalStake);
-      await Promise.all([fetchData(), refreshUser()]);
+      await refetchData();
+      toast.success(`Bought ${getEstShares.toFixed(0)} ${outcome.toUpperCase()} shares for ${finalStake} GOOS`);
+      setStake(100);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Order failed';
       setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setTrading(false);
     }
@@ -124,88 +115,48 @@ export default function LineDetail() {
     setError('');
 
     try {
+      const value = getSellValue(sellShares, outcome);
       await betsApi.sell(line.id, outcome, sellShares);
-      await Promise.all([fetchData(), refreshUser()]);
+      await refetchData();
+      toast.success(`Sold ${sellShares.toFixed(0)} ${outcome.toUpperCase()} shares for ${value.toFixed(0)} GOOS`);
       setSellShares(0);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Sell failed';
       setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setTrading(false);
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  const isOpen = line ? isMarketOpen(line, now) : false;
 
-  const isOpen = line && !line.resolved && new Date(line.closes_at) > now;
-
-  const calculateEstShares = (invest: number, out: 'yes' | 'no') => {
-    if (!line) return 0;
-    const k = line.yes_pool * line.no_pool;
-    let shares = 0;
-    if (out === 'yes') {
-      const newNo = line.no_pool + invest;
-      const newYes = k / newNo;
-      shares = invest + (line.yes_pool - newYes);
-    } else {
-      const newYes = line.yes_pool + invest;
-      const newNo = k / newYes;
-      shares = invest + (line.no_pool - newNo);
-    }
-    return shares;
-  };
-
-  const calculateCostForShares = (shares: number, out: 'yes' | 'no') => {
-    if (!line) return 0;
-    // Quadratic: I^2 + I(Y+N-S) - SN = 0
-    // I = Investment/Cost
-    const Y = out === 'yes' ? line.yes_pool : line.no_pool;
-    const N = out === 'yes' ? line.no_pool : line.yes_pool;
-    
-    const a = 1;
-    const b = Y + N - shares;
-    const c = -shares * N;
-    
-    const delta = b*b - 4*a*c;
-    if (delta < 0) return 0;
-    
-    const I = (-b + Math.sqrt(delta)) / (2*a);
-    return I;
-  };
-
-  // Estimates based on mode
-  const estShares = buyMode === 'amount' 
-    ? calculateEstShares(stake, outcome)
+  const pool = line ? { yes_pool: line.yes_pool, no_pool: line.no_pool } : { yes_pool: 0, no_pool: 0 };
+  
+  const getEstShares = buyMode === 'amount' 
+    ? calculateEstimatedShares(pool, stake, outcome)
     : targetShares;
     
-  const estCost = buyMode === 'amount'
+  const getEstCost = buyMode === 'amount'
     ? stake
-    : calculateCostForShares(targetShares, outcome);
+    : calculateCostForShares(pool, targetShares, outcome);
 
-  const estPrice = estShares > 0 ? estCost / estShares : 0;
+  const estPrice = getEstShares > 0 ? getEstCost / getEstShares : 0;
 
-  if (loading) return <LoadingSpinner />;
+  if (loadingLine) return <LoadingSpinner />;
   if (!line) return <div className="error">Market not found</div>;
 
   return (
     <div className="market-detail-container">
-      <button className="back-btn" onClick={() => navigate('/')}>
-        ← Back to Markets
+      <button className="back-btn" onClick={() => navigate(-1)}>
+        ← Back
       </button>
 
       <div className="market-title-section">
         <h1>{line.title}</h1>
         <div className="market-stats">
           <span>Volume: GOOS {(line.volume || 0).toLocaleString()}</span>
-          <span>Ends: {formatDate(line.closes_at)}</span>
+          <span>Ends: {formatDateFull(line.closes_at)}</span>
           <span className={`status-badge ${line.resolved ? 'resolved' : isOpen ? 'open' : 'closed'}`}>
             {line.resolved ? 'Resolved' : isOpen ? 'Trading Open' : 'Trading Closed'}
           </span>
@@ -224,104 +175,141 @@ export default function LineDetail() {
             className={`outcome-btn ${outcome === 'yes' ? 'selected yes' : ''}`}
             onClick={() => isOpen && setOutcome('yes')}
           >
-            <div style={{fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '0.25rem'}}>Yes</div>
-            <div style={{fontSize: '1.5rem', fontWeight: 800}}>{(line.odds.yes_probability * 100).toFixed(0)}%</div>
-            <div style={{fontSize: '0.8rem', opacity: 0.7}}>GOOS {line.odds.yes_probability.toFixed(2)}</div>
+            <div className="outcome-label-text">Yes</div>
+            <div className="outcome-percentage">{(line.odds.yes_probability * 100).toFixed(0)}%</div>
+            <div className="outcome-price">GOOS {line.odds.yes_probability.toFixed(2)}</div>
           </button>
           <button 
             className={`outcome-btn ${outcome === 'no' ? 'selected no' : ''}`}
             onClick={() => isOpen && setOutcome('no')}
           >
-            <div style={{fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '0.25rem'}}>No</div>
-            <div style={{fontSize: '1.5rem', fontWeight: 800}}>{(line.odds.no_probability * 100).toFixed(0)}%</div>
-            <div style={{fontSize: '0.8rem', opacity: 0.7}}>GOOS {line.odds.no_probability.toFixed(2)}</div>
+            <div className="outcome-label-text">No</div>
+            <div className="outcome-percentage">{(line.odds.no_probability * 100).toFixed(0)}%</div>
+            <div className="outcome-price">GOOS {line.odds.no_probability.toFixed(2)}</div>
           </button>
         </div>
 
         {isOpen && user ? (
           <>
-            {/* Buy/Sell Mode Toggle */}
-            <div className="trade-mode-tabs">
-              <button 
-                className={`mode-tab ${tradeMode === 'buy' ? 'active buy' : ''}`}
-                onClick={() => setTradeMode('buy')}
-              >
-                Buy
-              </button>
-              <button 
-                className={`mode-tab ${tradeMode === 'sell' ? 'active sell' : ''}`}
-                onClick={() => setTradeMode('sell')}
-                disabled={userPosition.totalShares <= 0}
-              >
-                Sell {userPosition.totalShares > 0 && `(${userPosition.totalShares.toFixed(1)})`}
-              </button>
-            </div>
+            {/* Buy/Sell Mode Toggle - only show sell if user has position */}
+            {userPosition.totalShares > 0 && (
+              <div className="trade-mode-tabs">
+                <button 
+                  className={`mode-tab ${tradeMode === 'buy' ? 'active buy' : ''}`}
+                  onClick={() => setTradeMode('buy')}
+                >
+                  Buy
+                </button>
+                <button 
+                  className={`mode-tab ${tradeMode === 'sell' ? 'active sell' : ''}`}
+                  onClick={() => setTradeMode('sell')}
+                >
+                  Sell ({userPosition.totalShares.toFixed(1)} shares)
+                </button>
+              </div>
+            )}
 
             {tradeMode === 'buy' ? (
               <>
-                <div className="input-tabs">
-                  <button 
-                    className={`tab-btn ${buyMode === 'amount' ? 'active' : ''}`}
-                    onClick={() => setBuyMode('amount')}
-                  >
-                    Amount ($G)
-                  </button>
-                  <button 
-                    className={`tab-btn ${buyMode === 'shares' ? 'active' : ''}`}
-                    onClick={() => setBuyMode('shares')}
-                  >
-                    Buy in Shares
-                  </button>
-                </div>
-
+                <p className="trading-guidance">How much do you want to bet?</p>
+                
                 <form onSubmit={handlePlaceBet}>
                   <div className="trade-input-container">
-                    {buyMode === 'amount' && <div className="currency-prefix">GOOS</div>}
+                    <div className="currency-prefix">GOOS</div>
                     <input
                       className="huge-input"
                       type="number"
                       min={1}
-                      max={buyMode === 'amount' ? user.karma_balance : undefined}
-                      value={buyMode === 'amount' ? stake : targetShares}
-                      onChange={(e) => buyMode === 'amount' ? setStake(Number(e.target.value)) : setTargetShares(Number(e.target.value))}
+                      max={user.karma_balance}
+                      value={stake}
+                      onChange={(e) => setStake(Number(e.target.value))}
                       placeholder="0"
                     />
                   </div>
 
-                  <div className="order-summary-card">
-                     <div className="summary-row">
-                       <span className="summary-label">Avg Price</span>
-                       <span className="summary-val">GOOS {estPrice.toFixed(2)}</span>
-                     </div>
-                     <div className="summary-row">
-                       <span className="summary-label">Est Shares</span>
-                       <span className="summary-val">{estShares.toFixed(2)}</span>
-                     </div>
-                     <div className="summary-row">
-                       <span className="summary-label">Payout if {outcome.toUpperCase()} wins</span>
-                       <span className="summary-val">GOOS {estShares.toFixed(0)}</span>
-                     </div>
-                     <div className="summary-row">
-                       <span className="summary-label">Est. profit if wins</span>
-                       <span className="summary-val">GOOS {(estShares - estCost).toFixed(0)} ({estCost > 0 ? (((estShares - estCost) / estCost) * 100).toFixed(0) : 0}%)</span>
-                     </div>
-                     <div className="summary-row">
-                       <span className="summary-label">Total Cost</span>
-                       <span className="summary-val">GOOS {estCost.toFixed(2)}</span>
-                     </div>
+                  {/* Simplified summary - just show profit */}
+                  <div className="simple-summary">
+                    <div className="profit-preview">
+                      +{(getEstShares - getEstCost).toFixed(0)} GOOS ({getEstCost > 0 ? (((getEstShares - getEstCost) / getEstCost) * 100).toFixed(0) : 0}%)
+                    </div>
+                    <div className="profit-label">Potential profit if {outcome.toUpperCase()} wins</div>
                   </div>
 
                   <button 
                     type="submit" 
-                    disabled={trading || (buyMode === 'amount' ? stake > user.karma_balance : estCost > user.karma_balance) || estCost <= 0}
+                    disabled={trading || stake > user.karma_balance || getEstCost <= 0}
                     className={`action-btn ${outcome}`}
                   >
-                    {trading ? 'Processing...' : `Buy ${outcome.toUpperCase()}`}
+                    {trading ? 'Processing...' : `Buy ${outcome.toUpperCase()} for ${stake} GOOS`}
                   </button>
                   
                   <div className="balance-hint">
-                    Available: GOOS {user.karma_balance.toLocaleString()}
+                    Balance: GOOS {user.karma_balance.toLocaleString()}
                   </div>
+
+                  {/* Advanced options - hidden by default */}
+                  <button 
+                    type="button" 
+                    className="advanced-toggle"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                  >
+                    {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    {showAdvanced ? 'Hide' : 'Show'} details
+                  </button>
+
+                  {showAdvanced && (
+                    <div className="advanced-options">
+                      <div className="input-tabs">
+                        <button 
+                          type="button"
+                          className={`tab-btn ${buyMode === 'amount' ? 'active' : ''}`}
+                          onClick={() => setBuyMode('amount')}
+                        >
+                          Amount (GOOS)
+                        </button>
+                        <button 
+                          type="button"
+                          className={`tab-btn ${buyMode === 'shares' ? 'active' : ''}`}
+                          onClick={() => setBuyMode('shares')}
+                        >
+                          Shares
+                        </button>
+                      </div>
+                      
+                      {buyMode === 'shares' && (
+                        <div className="trade-input-container" style={{marginTop: '1rem'}}>
+                          <div className="currency-prefix">Shares</div>
+                          <input
+                            className="huge-input"
+                            type="number"
+                            min={1}
+                            value={targetShares}
+                            onChange={(e) => setTargetShares(Number(e.target.value))}
+                            placeholder="0"
+                          />
+                        </div>
+                      )}
+
+                      <div className="order-summary-card">
+                        <div className="summary-row">
+                          <span className="summary-label">Avg Price</span>
+                          <span className="summary-val">GOOS {estPrice.toFixed(2)}</span>
+                        </div>
+                        <div className="summary-row">
+                          <span className="summary-label">Est Shares</span>
+                          <span className="summary-val">{getEstShares.toFixed(2)}</span>
+                        </div>
+                        <div className="summary-row">
+                          <span className="summary-label">Payout if {outcome.toUpperCase()} wins</span>
+                          <span className="summary-val">GOOS {getEstShares.toFixed(0)}</span>
+                        </div>
+                        <div className="summary-row">
+                          <span className="summary-label">Total Cost</span>
+                          <span className="summary-val">GOOS {getEstCost.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </form>
               </>
             ) : (
@@ -359,11 +347,11 @@ export default function LineDetail() {
                      </div>
                      <div className="summary-row">
                        <span className="summary-label">Est. Sell Price</span>
-                       <span className="summary-val">GOOS {sellShares > 0 ? (calculateSellValue(sellShares, outcome) / sellShares).toFixed(2) : '0.00'}</span>
+                       <span className="summary-val">GOOS {sellShares > 0 ? (getSellValue(sellShares, outcome) / sellShares).toFixed(2) : '0.00'}</span>
                      </div>
                      <div className="summary-row highlight">
                        <span className="summary-label">You'll Receive</span>
-                       <span className="summary-val">GOOS {calculateSellValue(sellShares, outcome).toFixed(0)}</span>
+                       <span className="summary-val">GOOS {getSellValue(sellShares, outcome).toFixed(0)}</span>
                      </div>
                   </div>
 
@@ -383,14 +371,14 @@ export default function LineDetail() {
             )}
           </>
         ) : (
-          <div style={{textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem'}}>
+          <div className="trading-closed-message">
             {!user ? 'Log in to trade' : 'Trading is closed'}
           </div>
         )}
       </div>
 
       {myBets.length > 0 && (
-        <div style={{ marginTop: '3rem' }}>
+        <div className="positions-section">
           <h3>Your Positions</h3>
           <table className="data-table">
             <thead>
@@ -411,7 +399,7 @@ export default function LineDetail() {
                   <td>{bet.buy_price ? '$' + bet.buy_price.toFixed(2) : '-'}</td>
                   <td>{bet.stake}</td>
                   <td>{bet.potential_payout?.toFixed(0) || '-'}</td>
-                  <td>{formatDate(bet.created_at)}</td>
+                  <td>{formatDateFull(bet.created_at)}</td>
                 </tr>
               ))}
             </tbody>

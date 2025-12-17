@@ -1,17 +1,20 @@
-import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Moon, Sun } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { ToastProvider } from './components/Toast';
+import WelcomeModal, { useOnboarding } from './components/WelcomeModal';
+import { useCurrentTime } from './hooks/useCurrentTime';
 import logoDark from './assets/watmarket_dark.png';
 import logoLight from './assets/watmarket_light.png';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Lines from './pages/Lines';
-import LineDetail from './pages/LineDetail';
+import Markets from './pages/Markets';
+import MarketDetail from './pages/LineDetail';
 import CreateLine from './pages/CreateLine';
 import Portfolio from './pages/Portfolio';
+import Dashboard from './pages/Dashboard';
 import Admin from './pages/Admin';
 import LoadingSpinner from './components/LoadingSpinner';
 import './App.css';
@@ -19,12 +22,7 @@ import './App.css';
 const queryClient = new QueryClient();
 
 function Clock() {
-  const [time, setTime] = useState(new Date());
-
-  useEffect(() => {
-    const timer = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  const time = useCurrentTime();
 
   return (
     <div className="sidebar-clock">
@@ -56,16 +54,16 @@ function Sidebar() {
 
       <div className="sidebar-nav">
         <Link to="/" className={`nav-item ${isActive('/')}`}>
-          <span className="icon">📈</span>
+          <span className="nav-label">Home</span>
+        </Link>
+        <Link to="/markets" className={`nav-item ${isActive('/markets')}`}>
           <span className="nav-label">Markets</span>
         </Link>
-        <Link to="/dashboard" className={`nav-item ${isActive('/dashboard')}`}>
-          <span className="icon">👤</span>
+        <Link to="/portfolio" className={`nav-item ${isActive('/portfolio')}`}>
           <span className="nav-label">Portfolio</span>
         </Link>
         {user.is_admin && (
           <Link to="/admin" className={`nav-item ${isActive('/admin')}`}>
-            <span className="icon">🛠️</span>
             <span className="nav-label">Admin</span>
           </Link>
         )}
@@ -83,7 +81,6 @@ function Sidebar() {
         <div className="sidebar-footer-content">
           <Clock />
           <div className="user-balance">
-            <span className="label">GOOS</span>
             <span className="currency">GOOS</span>
             <span className="amount">{user.karma_balance.toLocaleString()}</span>
           </div>
@@ -99,6 +96,7 @@ function Sidebar() {
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
+  const { showWelcome, completeOnboarding } = useOnboarding();
   
   if (isLoading) return <LoadingSpinner fullScreen />;
   if (!user) return <Navigate to="/login" />;
@@ -109,6 +107,7 @@ function Layout({ children }: { children: React.ReactNode }) {
       <main className="main-content">
         {children}
       </main>
+      {showWelcome && <WelcomeModal onComplete={completeOnboarding} />}
     </div>
   );
 }
@@ -120,10 +119,12 @@ function AppRoutes() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         
-        <Route path="/" element={<Layout><Lines /></Layout>} />
-        <Route path="/lines/:id" element={<Layout><LineDetail /></Layout>} />
-        <Route path="/lines/create" element={<Layout><CreateLine /></Layout>} />
-        <Route path="/dashboard" element={<Layout><Portfolio /></Layout>} />
+        <Route path="/" element={<Layout><Dashboard /></Layout>} />
+        <Route path="/markets" element={<Layout><Markets /></Layout>} />
+        <Route path="/markets/:id" element={<Layout><MarketDetail /></Layout>} />
+        <Route path="/lines/:id" element={<Layout><MarketDetail /></Layout>} />
+        <Route path="/markets/create" element={<Layout><CreateLine /></Layout>} />
+        <Route path="/portfolio" element={<Layout><Portfolio /></Layout>} />
         <Route path="/admin" element={<Layout><Admin /></Layout>} />
       </Routes>
     </BrowserRouter>
@@ -135,7 +136,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
-          <AppRoutes />
+          <ToastProvider>
+            <AppRoutes />
+          </ToastProvider>
         </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>

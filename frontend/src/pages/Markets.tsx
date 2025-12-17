@@ -1,19 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import type { Line } from '../api/client';
 import { linesApi } from '../api/client';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
+import { formatDate } from '../utils/formatters';
+import { useCurrentTime } from '../hooks/useCurrentTime';
+import { isMarketOpen } from '../utils/market';
 
-export default function Lines() {
+export default function Markets() {
   const [filter, setFilter] = useState<'all' | 'open' | 'resolved'>('open');
-  const [now, setNow] = useState(new Date());
-
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  const now = useCurrentTime();
 
   const { data: lines = [], isLoading: loading, error } = useQuery({
     queryKey: ['lines', filter],
@@ -23,16 +21,7 @@ export default function Lines() {
     }
   });
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const isOpen = (line: Line) => {
-    return !line.resolved && new Date(line.closes_at) > now;
-  };
+  const isOpen = (line: Line) => isMarketOpen(line, now);
 
   const getEmptyMessage = () => {
     switch (filter) {
@@ -81,7 +70,7 @@ export default function Lines() {
       ) : (
         <div className="lines-grid">
           {lines.map((line) => (
-            <Link to={`/lines/${line.id}`} key={line.id} className="market-card">
+            <Link to={`/markets/${line.id}`} key={line.id} className="market-card">
               <div className="market-header">
                 <h3>{line.title}</h3>
                 <div className="market-meta">

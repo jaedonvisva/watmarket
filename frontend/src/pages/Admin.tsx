@@ -5,6 +5,8 @@ import { linesApi, betsApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
+import { formatDateWithTime } from '../utils/formatters';
+import { getMarketStatus } from '../utils/market';
 
 interface MarketDetail {
   line: Line;
@@ -79,22 +81,9 @@ export default function Admin() {
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
   const now = new Date();
   
-  const getStatus = (line: Line) => {
-    if (line.resolved) return 'resolved';
-    if (new Date(line.closes_at) <= now) return 'closed';
-    return 'open';
-  };
+  const getStatus = (line: Line) => getMarketStatus(line, now);
 
   const filteredLines = lines.filter(line => {
     if (filter === 'all') return true;
@@ -126,7 +115,7 @@ export default function Admin() {
     <div className="admin-page">
       <div className="page-header">
         <h1>Admin Dashboard</h1>
-        <Link to="/lines/create" className="btn btn-primary">
+        <Link to="/markets/create" className="btn btn-primary">
           + Create Market
         </Link>
       </div>
@@ -208,7 +197,7 @@ export default function Admin() {
                   </td>
                   <td>{(line.odds.yes_probability * 100).toFixed(0)}%</td>
                   <td>GOOS {(line.volume || 0).toLocaleString()}</td>
-                  <td>{formatDate(line.closes_at)}</td>
+                  <td>{formatDateWithTime(line.closes_at)}</td>
                   <td>
                     <button 
                       className="btn-view"
@@ -266,7 +255,7 @@ export default function Admin() {
               </div>
               <div className="detail-stat">
                 <span className="label">Closes At</span>
-                <span className="value">{formatDate(selectedMarket.line.closes_at)}</span>
+                <span className="value">{formatDateWithTime(selectedMarket.line.closes_at)}</span>
               </div>
             </div>
 

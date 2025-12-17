@@ -32,7 +32,7 @@ export default function CreateLine() {
         closes_at: new Date(closesAt).toISOString(),
         initial_liquidity: initialLiquidity,
       });
-      navigate(`/lines/${response.data.id}`);
+      navigate(`/markets/${response.data.id}`);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create line';
       setError(errorMessage);

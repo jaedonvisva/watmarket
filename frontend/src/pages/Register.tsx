@@ -5,7 +5,6 @@ import { useAuth } from '../context/AuthContext';
 export default function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
@@ -14,11 +13,6 @@ export default function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
 
     if (password.length < 6) {
       setError('Password must be at least 6 characters');
@@ -62,16 +56,6 @@ export default function Register() {
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={6}
-          />
-        </div>
-        <div className="form-group">
-          <label htmlFor="confirmPassword">Confirm Password</label>
-          <input
-            id="confirmPassword"
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
           />
         </div>
         <button type="submit" disabled={loading}>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Clock, CheckCircle, XCircle } from 'lucide-react';
 import type { Trade } from '../api/client';
 
 interface ActivityFeedProps {
@@ -8,108 +8,117 @@ interface ActivityFeedProps {
   formatDate: (dateStr: string) => string;
 }
 
-interface ActivityRowProps {
+interface TradeCardProps {
   trade: Trade;
   formatDate: (dateStr: string) => string;
 }
 
-function ActivityRow({ trade, formatDate }: ActivityRowProps) {
+function TradeCard({ trade, formatDate }: TradeCardProps) {
   const [expanded, setExpanded] = useState(false);
   
   const isBuy = trade.type === 'buy';
-  const cashFlow = isBuy ? -trade.amount : trade.amount;
+  const isSell = trade.type === 'sell';
   
-  // Build action summary - handle missing data gracefully
-  const actionText = isBuy 
-    ? `Bought ${trade.outcome.toUpperCase()}`
-    : `Sold ${trade.outcome.toUpperCase()}`;
+  // Calculate P&L display
+  let displayAmount: number;
+  let isProfit: boolean;
   
-  // Only show shares/price if we have valid data
+  if (isBuy && trade.result === 'won') {
+    displayAmount = (trade.payout || 0) - trade.amount;
+    isProfit = displayAmount >= 0;
+  } else if (isBuy && trade.result === 'lost') {
+    displayAmount = -trade.amount;
+    isProfit = false;
+  } else if (isBuy) {
+    displayAmount = -trade.amount;
+    isProfit = false;
+  } else {
+    displayAmount = trade.amount;
+    isProfit = true;
+  }
+  
+  // Status info
+  const getStatus = () => {
+    if (isSell) return { label: 'Sold', class: 'sold', icon: null };
+    if (trade.result === 'won') return { label: 'Won', class: 'won', icon: <CheckCircle size={14} /> };
+    if (trade.result === 'lost') return { label: 'Lost', class: 'lost', icon: <XCircle size={14} /> };
+    return { label: 'Pending', class: 'pending', icon: <Clock size={14} /> };
+  };
+  
+  const status = getStatus();
   const hasSharesData = trade.shares > 0;
-  const sharesText = hasSharesData 
-    ? `${trade.shares.toFixed(0)} @ ${(trade.price * 100).toFixed(0)}¢`
-    : '';
 
   return (
-    <div className={`activity-row ${expanded ? 'expanded' : ''}`}>
-      <div className="activity-main" onClick={() => setExpanded(!expanded)}>
-        <div className="activity-left">
-          <div className="activity-action">
-            <span className={`action-type ${trade.type}`}>{actionText}</span>
-            {hasSharesData && <span className="action-shares">{sharesText}</span>}
-          </div>
+    <div className={`trade-card ${status.class} ${expanded ? 'expanded' : ''}`}>
+      <div className="trade-card-main" onClick={() => setExpanded(!expanded)}>
+        {/* Left: Market info */}
+        <div className="trade-card-left">
           <Link 
-            to={`/lines/${trade.line_id}`} 
-            className="activity-market"
+            to={`/markets/${trade.line_id}`} 
+            className="trade-card-market"
             onClick={(e) => e.stopPropagation()}
           >
             {trade.line_title}
           </Link>
+          <div className="trade-card-meta">
+            <span className={`trade-side ${trade.outcome}`}>{trade.outcome.toUpperCase()}</span>
+            {hasSharesData && (
+              <>
+                <span className="meta-dot">·</span>
+                <span className="trade-shares">{trade.shares.toFixed(0)} shares @ {trade.price.toFixed(2)} GOOS</span>
+              </>
+            )}
+            <span className="meta-dot">·</span>
+            <span className="trade-date">{formatDate(trade.created_at)}</span>
+          </div>
         </div>
         
-        <div className="activity-right">
-          <div className="activity-outcome">
-            <span className={`activity-cashflow ${cashFlow >= 0 ? 'positive' : 'negative'}`}>
-              {cashFlow >= 0 ? '+' : ''}{cashFlow.toLocaleString()}
-            </span>
-            {isBuy && trade.result === 'won' && (
-              <span className="activity-result won">Won</span>
-            )}
-            {isBuy && trade.result === 'lost' && (
-              <span className="activity-result lost">Lost</span>
-            )}
-            {isBuy && !trade.result && (
-              <span className="activity-result open">Open</span>
-            )}
+        {/* Right: P&L and status */}
+        <div className="trade-card-right">
+          <div className={`trade-pnl ${isProfit ? 'positive' : 'negative'}`}>
+            {displayAmount >= 0 ? '+' : ''}{displayAmount.toLocaleString()}
           </div>
-          <button className="expand-btn" aria-label="Toggle details">
-            {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          </button>
+          <div className={`trade-status ${status.class}`}>
+            {status.icon}
+            <span>{status.label}</span>
+          </div>
         </div>
+        
+        <button className="trade-expand-btn" aria-label="Toggle details">
+          {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        </button>
       </div>
       
       {expanded && (
-        <div className="activity-details">
-          <div className="detail-grid">
-            <div className="detail-item">
-              <span className="detail-label">Date</span>
-              <span className="detail-value">{formatDate(trade.created_at)}</span>
-            </div>
-            <div className="detail-item">
+        <div className="trade-card-details">
+          <div className="trade-detail-row">
+            <div className="trade-detail">
               <span className="detail-label">Type</span>
-              <span className="detail-value">{trade.type.toUpperCase()}</span>
+              <span className={`detail-value type-${trade.type}`}>{trade.type.toUpperCase()}</span>
             </div>
-            <div className="detail-item">
+            <div className="trade-detail">
               <span className="detail-label">Side</span>
-              <span className={`detail-value ${trade.outcome}`}>{trade.outcome.toUpperCase()}</span>
+              <span className={`detail-value side-${trade.outcome}`}>{trade.outcome.toUpperCase()}</span>
             </div>
-            <div className="detail-item">
+            <div className="trade-detail">
               <span className="detail-label">Shares</span>
               <span className="detail-value">{trade.shares.toFixed(2)}</span>
             </div>
-            <div className="detail-item">
+            <div className="trade-detail">
               <span className="detail-label">Price</span>
-              <span className="detail-value">{trade.price.toFixed(2)}¢</span>
+              <span className="detail-value">{trade.price.toFixed(2)} GOOS</span>
             </div>
-            <div className="detail-item">
-              <span className="detail-label">Amount</span>
+            <div className="trade-detail">
+              <span className="detail-label">Cost/Proceeds</span>
               <span className="detail-value">{trade.amount.toLocaleString()} GOOS</span>
             </div>
-            {trade.result && (
-              <div className="detail-item">
-                <span className="detail-label">Result</span>
-                <span className={`detail-value ${trade.result}`}>
-                  {trade.result === 'won' ? `Won +${trade.payout?.toFixed(0) || 0}` : 'Lost'}
-                </span>
+            {trade.result === 'won' && trade.payout && (
+              <div className="trade-detail">
+                <span className="detail-label">Payout</span>
+                <span className="detail-value positive">+{trade.payout.toFixed(0)} GOOS</span>
               </div>
             )}
           </div>
-          <Link 
-            to={`/lines/${trade.line_id}`} 
-            className="view-market-btn"
-          >
-            View Market →
-          </Link>
         </div>
       )}
     </div>
@@ -122,10 +131,13 @@ export default function ActivityFeed({ trades, formatDate }: ActivityFeedProps) 
   }
 
   return (
-    <div className="activity-feed">
-      {trades.map((trade) => (
-        <ActivityRow key={trade.id} trade={trade} formatDate={formatDate} />
-      ))}
+    <div className="activity-feed-v2">
+      {/* Trade Cards */}
+      <div className="trade-cards">
+        {trades.map((trade) => (
+          <TradeCard key={trade.id} trade={trade} formatDate={formatDate} />
+        ))}
+      </div>
     </div>
   );
 }

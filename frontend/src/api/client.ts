@@ -1,4 +1,19 @@
 import axios from 'axios';
+import type {
+  User,
+  Line,
+  Bet,
+  AdminBet,
+  Trade,
+  Position,
+  PortfolioSummary,
+  PriceHistoryPoint,
+  SellSharesResponse,
+  AuthResponse,
+} from './types';
+
+// Re-export all types for backwards compatibility
+export * from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -30,122 +45,6 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-
-// Types
-export interface User {
-  id: string;
-  email: string;
-  karma_balance: number;
-  is_admin: boolean;
-  created_at: string;
-}
-
-export interface LineOdds {
-  yes_probability: number;
-  no_probability: number;
-  yes_odds: number;
-  no_odds: number;
-}
-
-export interface Line {
-  id: string;
-  title: string;
-  description: string | null;
-  closes_at: string;
-  yes_pool: number;
-  no_pool: number;
-  volume: number;
-  resolved: boolean;
-  correct_outcome: 'yes' | 'no' | null;
-  created_at: string;
-  odds: LineOdds;
-}
-
-export interface Bet {
-  id: string;
-  user_id: string;
-  line_id: string;
-  outcome: 'yes' | 'no';
-  stake: number;
-  shares?: number;
-  created_at: string;
-  potential_payout: number | null;
-  buy_price?: number;
-  payout?: number;
-}
-
-export interface AdminBet extends Bet {
-  user_email: string;
-}
-
-export interface Trade {
-  id: string;
-  created_at: string;
-  line_id: string;
-  line_title: string;
-  outcome: 'yes' | 'no';
-  type: 'buy' | 'sell';
-  shares: number;
-  price: number;
-  amount: number;  // Cost for buy, Revenue for sell
-  is_resolved: boolean;
-  result: 'won' | 'lost' | null;
-  payout: number | null;
-}
-
-export interface Position {
-  line_id: string;
-  line_title: string;
-  line_resolved: boolean;
-  line_correct_outcome: 'yes' | 'no' | null;
-  outcome: 'yes' | 'no';
-  total_shares: number;
-  total_cost: number;
-  avg_buy_price: number;
-  current_price: number;
-  current_value: number;
-  pnl: number;
-  pnl_percent: number;
-  payout: number | null;
-  is_active: boolean;
-}
-
-export interface PortfolioSummary {
-  cash_balance: number;
-  invested_value: number;
-  positions_value: number;
-  total_portfolio_value: number;
-  total_pnl: number;
-  total_pnl_percent: number;
-  active_positions_count: number;
-  resolved_positions_count: number;
-}
-
-export interface PriceHistoryPoint {
-  yes_price: number;
-  no_price: number;
-  created_at: string;
-}
-
-export interface SellSharesRequest {
-  line_id: string;
-  outcome: 'yes' | 'no';
-  shares: number;
-}
-
-export interface SellSharesResponse {
-  shares_sold: number;
-  amount_received: number;
-  sell_price: number;
-  new_balance: number;
-  remaining_shares: number;
-}
-
-export interface AuthResponse {
-  access_token: string;
-  token_type: string;
-  user: User;
-}
 
 // API functions
 export const authApi = {
