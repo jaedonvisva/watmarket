@@ -11,7 +11,7 @@ def resolve_line(line_id: UUID, correct_outcome: str) -> Dict:
     Uses atomic database function to prevent race conditions and double-resolution.
     
     Payout Logic (CPMM):
-    - Winners receive shares * 1.0 (rounded to integer GOOSE)
+    - Winners receive shares * 1.0 (rounded to integer GOOS)
     - Losers receive 0
     
     Returns summary of resolution.

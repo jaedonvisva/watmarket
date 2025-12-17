@@ -90,7 +90,7 @@ class SellSharesRequest(BaseModel):
 class SellSharesResponse(BaseModel):
     """Response after selling shares."""
     shares_sold: float
-    amount_received: float  # GOOSE received
+    amount_received: float  # GOOS received
     sell_price: float  # amount_received / shares_sold
     new_balance: int
     remaining_shares: float
@@ -122,7 +122,7 @@ class PositionResponse(BaseModel):
     total_cost: float  # Total stake spent
     avg_buy_price: float
     current_price: float
-    current_value: float  # shares * current_price
+    current_value: float  # CPMM liquidation value (what you'd receive if you sold now)
     pnl: float  # current_value - total_cost (or payout - total_cost if resolved)
     pnl_percent: float
     payout: Optional[float] = None  # If resolved

@@ -8,7 +8,7 @@ import EmptyState from '../components/EmptyState';
 import { formatDateWithTime } from '../utils/formatters';
 import { getMarketStatus } from '../utils/market';
 
-interface MarketDetail {
+interface LineDetailModal {
   line: Line;
   bets: AdminBet[];
 }
@@ -23,7 +23,7 @@ export default function Admin() {
   const [resolving, setResolving] = useState<string | null>(null);
   
   // Detail modal state
-  const [selectedMarket, setSelectedMarket] = useState<MarketDetail | null>(null);
+  const [selectedLine, setSelectedLine] = useState<LineDetailModal | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
   // Redirect non-admins
@@ -49,21 +49,21 @@ export default function Admin() {
     }
   };
 
-  const openMarketDetail = async (line: Line) => {
+  const openLineDetail = async (line: Line) => {
     setLoadingDetail(true);
-    setSelectedMarket({ line, bets: [] });
+    setSelectedLine({ line, bets: [] });
     try {
       const betsRes = await betsApi.getAllForLine(line.id);
-      setSelectedMarket({ line, bets: betsRes.data });
+      setSelectedLine({ line, bets: betsRes.data });
     } catch {
-      setError('Failed to load market details');
+      setError('Failed to load line details');
     } finally {
       setLoadingDetail(false);
     }
   };
 
   const closeModal = () => {
-    setSelectedMarket(null);
+    setSelectedLine(null);
   };
 
   const handleResolve = async (lineId: string, outcome: 'yes' | 'no') => {
@@ -183,7 +183,7 @@ export default function Admin() {
                   <td>
                     <span 
                       style={{ color: 'var(--gold)', cursor: 'pointer' }}
-                      onClick={() => openMarketDetail(line)}
+                      onClick={() => openLineDetail(line)}
                     >
                       {line.title.length > 50 ? line.title.slice(0, 50) + '...' : line.title}
                     </span>
@@ -201,7 +201,7 @@ export default function Admin() {
                   <td>
                     <button 
                       className="btn-view"
-                      onClick={() => openMarketDetail(line)}
+                      onClick={() => openLineDetail(line)}
                     >
                       View
                     </button>
@@ -214,72 +214,72 @@ export default function Admin() {
       )}
 
       {/* Market Detail Modal */}
-      {selectedMarket && (
+      {selectedLine && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-content admin-modal" onClick={e => e.stopPropagation()}>
             <button className="modal-close" onClick={closeModal}>×</button>
             
-            <h2>{selectedMarket.line.title}</h2>
-            {selectedMarket.line.description && (
+            <h2>{selectedLine.line.title}</h2>
+            {selectedLine.line.description && (
               <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
-                {selectedMarket.line.description}
+                {selectedLine.line.description}
               </p>
             )}
 
             <div className="admin-detail-stats">
               <div className="detail-stat">
                 <span className="label">Status</span>
-                <span className={`status-badge ${getStatus(selectedMarket.line)}`}>
-                  {getStatus(selectedMarket.line).toUpperCase()}
+                <span className={`status-badge ${getStatus(selectedLine.line)}`}>
+                  {getStatus(selectedLine.line).toUpperCase()}
                 </span>
               </div>
               <div className="detail-stat">
                 <span className="label">Volume</span>
-                <span className="value">GOOS {(selectedMarket.line.volume || 0).toLocaleString()}</span>
+                <span className="value">GOOS {(selectedLine.line.volume || 0).toLocaleString()}</span>
               </div>
               <div className="detail-stat">
                 <span className="label">Yes Pool</span>
-                <span className="value yes">{selectedMarket.line.yes_pool.toFixed(2)}</span>
+                <span className="value yes">{selectedLine.line.yes_pool.toFixed(2)}</span>
               </div>
               <div className="detail-stat">
                 <span className="label">No Pool</span>
-                <span className="value no">{selectedMarket.line.no_pool.toFixed(2)}</span>
+                <span className="value no">{selectedLine.line.no_pool.toFixed(2)}</span>
               </div>
               <div className="detail-stat">
                 <span className="label">Yes Price</span>
-                <span className="value">{(selectedMarket.line.odds.yes_probability * 100).toFixed(1)}%</span>
+                <span className="value">{(selectedLine.line.odds.yes_probability * 100).toFixed(1)}%</span>
               </div>
               <div className="detail-stat">
                 <span className="label">No Price</span>
-                <span className="value">{(selectedMarket.line.odds.no_probability * 100).toFixed(1)}%</span>
+                <span className="value">{(selectedLine.line.odds.no_probability * 100).toFixed(1)}%</span>
               </div>
               <div className="detail-stat">
                 <span className="label">Closes At</span>
-                <span className="value">{formatDateWithTime(selectedMarket.line.closes_at)}</span>
+                <span className="value">{formatDateWithTime(selectedLine.line.closes_at)}</span>
               </div>
             </div>
 
             {/* Resolution Controls */}
-            {!selectedMarket.line.resolved && (
+            {!selectedLine.line.resolved && (
               <div className="admin-resolve-section">
                 <h3>Resolve Market</h3>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-                  {getStatus(selectedMarket.line) === 'open' 
+                  {getStatus(selectedLine.line) === 'open' 
                     ? 'This will close trading early and resolve the market.'
                     : 'Select the winning outcome to distribute payouts.'}
                 </p>
                 <div className="resolve-actions">
                   <button
                     className="btn-resolve yes"
-                    onClick={() => handleResolve(selectedMarket.line.id, 'yes')}
-                    disabled={resolving === selectedMarket.line.id}
+                    onClick={() => handleResolve(selectedLine.line.id, 'yes')}
+                    disabled={resolving === selectedLine.line.id}
                   >
                     Resolve YES
                   </button>
                   <button
                     className="btn-resolve no"
-                    onClick={() => handleResolve(selectedMarket.line.id, 'no')}
-                    disabled={resolving === selectedMarket.line.id}
+                    onClick={() => handleResolve(selectedLine.line.id, 'no')}
+                    disabled={resolving === selectedLine.line.id}
                   >
                     Resolve NO
                   </button>
@@ -287,12 +287,12 @@ export default function Admin() {
               </div>
             )}
 
-            {selectedMarket.line.resolved && selectedMarket.line.correct_outcome && (
+            {selectedLine.line.resolved && selectedLine.line.correct_outcome && (
               <div className="admin-resolve-section resolved">
                 <h3>Resolution</h3>
                 <p>
-                  This market resolved to <strong className={selectedMarket.line.correct_outcome}>
-                    {selectedMarket.line.correct_outcome.toUpperCase()}
+                  This market resolved to <strong className={selectedLine.line.correct_outcome}>
+                    {selectedLine.line.correct_outcome.toUpperCase()}
                   </strong>
                 </p>
               </div>
@@ -300,10 +300,10 @@ export default function Admin() {
 
             {/* Positions Table */}
             <div className="admin-positions-section">
-              <h3>Positions ({selectedMarket.bets.length} trades)</h3>
+              <h3>Positions ({selectedLine.bets.length} trades)</h3>
               {loadingDetail ? (
                 <LoadingSpinner />
-              ) : selectedMarket.bets.length === 0 ? (
+              ) : selectedLine.bets.length === 0 ? (
                 <p style={{ color: 'var(--text-secondary)' }}>No positions yet</p>
               ) : (
                 <table className="data-table">
@@ -316,7 +316,7 @@ export default function Admin() {
                     </tr>
                   </thead>
                   <tbody>
-                    {aggregatePositions(selectedMarket.bets).map((pos, idx) => (
+                    {aggregatePositions(selectedLine.bets).map((pos, idx) => (
                       <tr key={idx}>
                         <td>{pos.email}</td>
                         <td className="yes">{pos.yesShares.toFixed(2)}</td>

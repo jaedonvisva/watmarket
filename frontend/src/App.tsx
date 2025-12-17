@@ -11,7 +11,7 @@ import logoLight from './assets/watmarket_light.png';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Markets from './pages/Markets';
-import MarketDetail from './pages/LineDetail';
+import LineDetail from './pages/LineDetail';
 import CreateLine from './pages/CreateLine';
 import Portfolio from './pages/Portfolio';
 import Dashboard from './pages/Dashboard';
@@ -121,8 +121,8 @@ function AppRoutes() {
         
         <Route path="/" element={<Layout><Dashboard /></Layout>} />
         <Route path="/markets" element={<Layout><Markets /></Layout>} />
-        <Route path="/markets/:id" element={<Layout><MarketDetail /></Layout>} />
-        <Route path="/lines/:id" element={<Layout><MarketDetail /></Layout>} />
+        <Route path="/markets/:id" element={<Layout><LineDetail /></Layout>} />
+        <Route path="/lines/:id" element={<Layout><LineDetail /></Layout>} />
         <Route path="/markets/create" element={<Layout><CreateLine /></Layout>} />
         <Route path="/portfolio" element={<Layout><Portfolio /></Layout>} />
         <Route path="/admin" element={<Layout><Admin /></Layout>} />

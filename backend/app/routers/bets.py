@@ -57,7 +57,7 @@ async def place_bet(
         error_msg = str(e)
         # Map database errors to HTTP errors
         if "Insufficient balance" in error_msg:
-            raise HTTPException(status_code=400, detail="Insufficient GOOSE balance")
+            raise HTTPException(status_code=400, detail="Insufficient GOOS balance")
         elif "Line not found" in error_msg:
             raise HTTPException(status_code=404, detail="Line not found")
         elif "Line is resolved" in error_msg:

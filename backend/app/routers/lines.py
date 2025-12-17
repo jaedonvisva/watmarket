@@ -128,7 +128,7 @@ async def resolve_prediction_line(
     This will:
     1. Mark the line as resolved with the correct outcome
     2. Calculate payouts for winning bets
-    3. Update user GOOSE balances
+    3. Update user GOOS balances
     4. Create payout transactions
     """
     try:

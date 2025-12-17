@@ -5,7 +5,7 @@ from app.routers import users, lines, bets
 
 app = FastAPI(
     title="WatMarket Prediction Market API",
-    description="University-specific prediction market using GOOSE tokens",
+    description="University-specific prediction market using GOOS tokens",
     version="1.0.0"
 )
 
