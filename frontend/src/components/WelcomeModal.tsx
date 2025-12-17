@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { TrendingUp, DollarSign, BarChart2, ArrowRight } from 'lucide-react';
+import { Coins, ArrowRight } from 'lucide-react';
 
 const ONBOARDING_KEY = 'watmarket_onboarding_complete';
 
@@ -38,7 +38,7 @@ export default function WelcomeModal({ onComplete }: WelcomeModalProps) {
             You've been given <strong>10,000 GOOS</strong> (play money) to predict outcomes on questions that matter to you.
           </p>
           <div className="welcome-highlight">
-            <DollarSign size={24} />
+            <Coins size={24} />
             <div>
               <strong>GOOS</strong> is our virtual currency. Use it to place predictions and track your performance.
             </div>

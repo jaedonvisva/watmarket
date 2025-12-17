@@ -177,7 +177,7 @@ export default function LineDetail() {
           >
             <div className="outcome-label-text">Yes</div>
             <div className="outcome-percentage">{(line.odds.yes_probability * 100).toFixed(0)}%</div>
-            <div className="outcome-price">GOOS {line.odds.yes_probability.toFixed(2)}</div>
+            <div className="outcome-price">{(line.odds.yes_probability * 100).toFixed(1)}%</div>
           </button>
           <button 
             className={`outcome-btn ${outcome === 'no' ? 'selected no' : ''}`}
@@ -185,7 +185,7 @@ export default function LineDetail() {
           >
             <div className="outcome-label-text">No</div>
             <div className="outcome-percentage">{(line.odds.no_probability * 100).toFixed(0)}%</div>
-            <div className="outcome-price">GOOS {line.odds.no_probability.toFixed(2)}</div>
+            <div className="outcome-price">{(line.odds.no_probability * 100).toFixed(1)}%</div>
           </button>
         </div>
 
@@ -396,7 +396,7 @@ export default function LineDetail() {
                 <tr key={bet.id}>
                   <td className={bet.outcome}>{bet.outcome.toUpperCase()}</td>
                   <td>{bet.shares?.toFixed(2) || '-'}</td>
-                  <td>{bet.buy_price ? '$' + bet.buy_price.toFixed(2) : '-'}</td>
+                  <td>{bet.buy_price ? `GOOS ${bet.buy_price.toFixed(2)}` : '-'}</td>
                   <td>{bet.stake}</td>
                   <td>{bet.potential_payout?.toFixed(0) || '-'}</td>
                   <td>{formatDateFull(bet.created_at)}</td>

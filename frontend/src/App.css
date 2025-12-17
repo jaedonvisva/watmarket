@@ -3550,6 +3550,13 @@ textarea.form-input {
   box-shadow: var(--shadow-md);
 }
 
+.tooltip-price {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.15rem;
+}
+
 .tooltip-date {
   font-size: 0.8125rem;
   color: var(--text-secondary);

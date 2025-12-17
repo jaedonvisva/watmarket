@@ -54,8 +54,8 @@ export default function PriceChart({ data, currentYesPrice }: PriceChartProps) {
   const chartData = useMemo(() => {
     return filteredData.map(point => ({
       time: new Date(point.created_at).getTime(),
-      yes: Math.round(point.yes_price * 100),
-      no: Math.round(point.no_price * 100),
+      yes: point.yes_price,
+      no: point.no_price,
     }));
   }, [filteredData]);
 
@@ -63,7 +63,7 @@ export default function PriceChart({ data, currentYesPrice }: PriceChartProps) {
   const stats = useMemo(() => {
     if (chartData.length === 0) return { current: 0, change: 0, changePercent: 0, isPositive: true };
     
-    const current = currentYesPrice !== undefined ? Math.round(currentYesPrice * 100) : chartData[chartData.length - 1].yes;
+    const current = currentYesPrice !== undefined ? currentYesPrice : chartData[chartData.length - 1].yes;
     const first = chartData[0].yes;
     const change = current - first;
     const changePercent = first !== 0 ? (change / first) * 100 : 0;
@@ -77,7 +77,7 @@ export default function PriceChart({ data, currentYesPrice }: PriceChartProps) {
   }, [chartData, currentYesPrice]);
 
   // Use current price when no chart data available for the period
-  const displayValue = hoveredData?.yes ?? (chartData.length > 0 ? stats.current : (currentYesPrice !== undefined ? Math.round(currentYesPrice * 100) : 0));
+  const displayValue = hoveredData?.yes ?? (chartData.length > 0 ? stats.current : (currentYesPrice !== undefined ? currentYesPrice : 0));
   
   const timePeriods: TimePeriod[] = ['1D', '1W', '1M', '3M', '6M', 'YTD', '1Y', 'ALL'];
   
@@ -105,13 +105,13 @@ export default function PriceChart({ data, currentYesPrice }: PriceChartProps) {
 
   // If no data at all, show the current price with a message
   if (data.length === 0) {
-    const currentValue = currentYesPrice !== undefined ? Math.round(currentYesPrice * 100) : 50;
+    const currentValue = currentYesPrice !== undefined ? currentYesPrice : 0.5;
     return (
       <div className="robinhood-chart">
         <div className="chart-header">
           <div className="chart-value-display">
             <div className="chart-value-row">
-              <span className="chart-current-value">{currentValue}¢</span>
+              <span className="chart-current-value">{(currentValue * 100).toFixed(1)}%</span>
               <span className="chart-outcome-label">Yes</span>
             </div>
             <span className="chart-change neutral">No trading activity yet</span>
@@ -144,12 +144,12 @@ export default function PriceChart({ data, currentYesPrice }: PriceChartProps) {
       <div className="chart-header">
         <div className="chart-value-display">
           <div className="chart-value-row">
-            <span className="chart-current-value">{displayValue}¢</span>
+            <span className="chart-current-value">{(displayValue * 100).toFixed(1)}%</span>
             <span className="chart-outcome-label">Yes</span>
           </div>
           {hasDataForPeriod ? (
             <span className={`chart-change ${stats.isPositive ? 'positive' : 'negative'}`}>
-              {stats.isPositive ? '+' : ''}{stats.change}¢ ({stats.isPositive ? '+' : ''}{stats.changePercent.toFixed(1)}%) {period !== 'ALL' ? period : 'all time'}
+              {stats.isPositive ? '+' : ''}{(stats.change * 100).toFixed(1)}pp ({stats.isPositive ? '+' : ''}{stats.changePercent.toFixed(1)}%) {period !== 'ALL' ? period : 'all time'}
             </span>
           ) : (
             <span className="chart-change neutral">No trading activity {period !== 'ALL' ? `in ${period}` : ''}</span>
@@ -162,6 +162,7 @@ export default function PriceChart({ data, currentYesPrice }: PriceChartProps) {
           <ResponsiveContainer width="100%" height={200}>
             <AreaChart 
               data={chartData}
+              margin={{ top: 8, right: 8, left: 28, bottom: 0 }}
               onMouseMove={(e) => {
                 const payload = (e as unknown as { activePayload?: Array<{ payload: { yes: number; time: number } }> }).activePayload;
                 if (payload && payload[0]) {
@@ -183,8 +184,12 @@ export default function PriceChart({ data, currentYesPrice }: PriceChartProps) {
                 hide={true}
               />
               <YAxis 
-                domain={['dataMin - 5', 'dataMax + 5']} 
-                hide={true}
+                domain={[0, 1]}
+                ticks={[0, 0.25, 0.5, 0.75, 1]}
+                tickFormatter={(v: number) => `${Math.round(v * 100)}%`}
+                axisLine={false}
+                tickLine={false}
+                width={40}
               />
               <Tooltip 
                 content={({ active, payload }) => {
@@ -192,6 +197,7 @@ export default function PriceChart({ data, currentYesPrice }: PriceChartProps) {
                     const d = payload[0].payload;
                     return (
                       <div className="chart-tooltip">
+                        <div className="tooltip-price">{(d.yes * 100).toFixed(2)}%</div>
                         <div className="tooltip-date">
                           {new Date(d.time).toLocaleDateString('en-US', { 
                             month: 'short', 

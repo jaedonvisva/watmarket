@@ -9,7 +9,7 @@ import EmptyState from '../components/EmptyState';
 import ActivityFeed from '../components/ActivityFeed';
 import GroupedTradesView from '../components/GroupedTradesView';
 import PositionRow from '../components/PositionRow';
-import { TrendingUp, TrendingDown, Wallet, PieChart, Download, Layers, List, Filter, X, Search, DollarSign, BarChart3 } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, PieChart, Download, Layers, List, Filter, X, Search, Coins, BarChart3 } from 'lucide-react';
 import { formatDateWithTime, formatPnL, formatPercent } from '../utils/formatters';
 import { REFETCH_INTERVALS } from '../constants';
 
@@ -155,7 +155,7 @@ export default function Portfolio() {
             </div>
           </div>
           <div className="hero-stat">
-            <DollarSign size={16} />
+            <Coins size={16} />
             <div className="stat-content">
               <span className="stat-label">Unrealized P&L</span>
               <span className={`stat-value ${(portfolio?.positions_value || 0) - (portfolio?.invested_value || 0) >= 0 ? 'positive' : 'negative'}`}>
