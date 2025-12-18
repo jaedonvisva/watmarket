@@ -128,6 +128,8 @@ async def sell_shares(
             raise HTTPException(status_code=400, detail=error_msg)
         elif "min_amount_out must be positive" in error_msg:
             raise HTTPException(status_code=400, detail="min_amount_out must be positive")
+        elif "min_amount_out must be an integer" in error_msg:
+            raise HTTPException(status_code=400, detail="min_amount_out must be an integer")
         else:
             raise HTTPException(status_code=500, detail=f"Failed to sell shares: {error_msg}")
 

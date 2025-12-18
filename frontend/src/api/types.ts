@@ -88,6 +88,7 @@ export interface SellSharesRequest {
   line_id: string;
   outcome: Outcome;
   shares: number;
+  min_amount_out: number;
 }
 
 export interface SellSharesResponse {

@@ -117,10 +117,11 @@ export default function LineDetail() {
 
     try {
       const value = getSellValue(sellShares, outcome);
-      const minAmountOut = value * (1 - DEFAULTS.SLIPPAGE_TOLERANCE);
+      const valueInt = Math.floor(value);
+      const minAmountOut = Math.floor(value * (1 - DEFAULTS.SLIPPAGE_TOLERANCE));
       await betsApi.sell(line.id, outcome, sellShares, minAmountOut);
       await refetchData();
-      toast.success(`Sold ${sellShares.toFixed(0)} ${outcome.toUpperCase()} shares for ${value.toFixed(0)} GOOS`);
+      toast.success(`Sold ${sellShares.toFixed(0)} ${outcome.toUpperCase()} shares for ${valueInt.toFixed(0)} GOOS`);
       setSellShares(0);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Sell failed';
@@ -351,11 +352,11 @@ export default function LineDetail() {
                      </div>
                      <div className="summary-row">
                        <span className="summary-label">Est. Sell Price</span>
-                       <span className="summary-val">GOOS {sellShares > 0 ? (getSellValue(sellShares, outcome) / sellShares).toFixed(2) : '0.00'}</span>
+                       <span className="summary-val">GOOS {sellShares > 0 ? (Math.floor(getSellValue(sellShares, outcome)) / sellShares).toFixed(2) : '0.00'}</span>
                      </div>
                      <div className="summary-row highlight">
                        <span className="summary-label">You'll Receive</span>
-                       <span className="summary-val">GOOS {getSellValue(sellShares, outcome).toFixed(0)}</span>
+                       <span className="summary-val">GOOS {Math.floor(getSellValue(sellShares, outcome)).toFixed(0)}</span>
                      </div>
                   </div>
 
