@@ -116,7 +116,10 @@ async def get_my_trades(current_user: UserResponse = Depends(get_current_user)):
         result = None
         payout = None
         if is_resolved and correct_outcome:
-            if bet["outcome"] == correct_outcome:
+            if correct_outcome == "invalid":
+                result = "refunded"
+                payout = None
+            elif bet["outcome"] == correct_outcome:
                 result = "won"
                 payout = bet.get("payout") or bet.get("shares") or 0
             else:

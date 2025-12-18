@@ -157,8 +157,10 @@ export default function LineDetail() {
         <div className="market-stats">
           <span>Volume: GOOS {(line.volume || 0).toLocaleString()}</span>
           <span>Ends: {formatDateFull(line.closes_at)}</span>
-          <span className={`status-badge ${line.resolved ? 'resolved' : isOpen ? 'open' : 'closed'}`}>
-            {line.resolved ? 'Resolved' : isOpen ? 'Trading Open' : 'Trading Closed'}
+          <span className={`status-badge ${line.resolved ? (line.correct_outcome === 'invalid' ? 'invalid' : 'resolved') : isOpen ? 'open' : 'closed'}`}>
+            {line.resolved 
+              ? (line.correct_outcome === 'invalid' ? 'Cancelled' : `Resolved ${line.correct_outcome?.toUpperCase()}`)
+              : isOpen ? 'Trading Open' : 'Trading Closed'}
           </span>
         </div>
       </div>
@@ -372,7 +374,11 @@ export default function LineDetail() {
           </>
         ) : (
           <div className="trading-closed-message">
-            {!user ? 'Log in to trade' : 'Trading is closed'}
+            {!user 
+              ? 'Log in to trade' 
+              : line.correct_outcome === 'invalid'
+                ? 'Market was cancelled. Your net investment has been refunded.'
+                : 'Trading is closed'}
           </div>
         )}
       </div>

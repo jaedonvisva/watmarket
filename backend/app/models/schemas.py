@@ -61,7 +61,7 @@ class LineResponse(BaseModel):
     no_pool: float
     volume: float = 0
     resolved: bool
-    correct_outcome: Optional[Literal["yes", "no"]]
+    correct_outcome: Optional[Literal["yes", "no", "invalid"]]
     created_at: datetime
     odds: LineOdds
 
@@ -70,6 +70,15 @@ class LineResponse(BaseModel):
 
 class LineResolve(BaseModel):
     correct_outcome: Literal["yes", "no"]
+
+
+class LineInvalidateResponse(BaseModel):
+    """Response after invalidating a market."""
+    line_id: UUID
+    correct_outcome: Literal["invalid"]
+    users_refunded: int
+    total_refunded: float
+    resolved_at: datetime
 
 
 # ============ Bet Schemas ============
@@ -116,7 +125,7 @@ class PositionResponse(BaseModel):
     line_id: UUID
     line_title: str
     line_resolved: bool
-    line_correct_outcome: Optional[Literal["yes", "no"]]
+    line_correct_outcome: Optional[Literal["yes", "no", "invalid"]]
     outcome: Literal["yes", "no"]
     total_shares: float
     total_cost: float  # Total stake spent
@@ -149,7 +158,7 @@ class TransactionResponse(BaseModel):
     id: UUID
     user_id: UUID
     amount: int
-    type: Literal["bet", "payout", "initial", "sell"]
+    type: Literal["bet", "payout", "initial", "sell", "refund"]
     reference_id: Optional[UUID]
     created_at: datetime
 
@@ -170,7 +179,7 @@ class TradeHistoryItem(BaseModel):
     
     # Resolution info (mostly for buys)
     is_resolved: bool
-    result: Optional[Literal["won", "lost"]] = None
+    result: Optional[Literal["won", "lost", "refunded"]] = None
     payout: Optional[float] = None  # Amount received if resolved
 
     model_config = ConfigDict(from_attributes=True)

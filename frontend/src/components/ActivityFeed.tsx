@@ -29,6 +29,9 @@ function TradeCard({ trade, formatDate }: TradeCardProps) {
   } else if (isBuy && trade.result === 'lost') {
     displayAmount = -trade.amount;
     isProfit = false;
+  } else if (isBuy && trade.result === 'refunded') {
+    displayAmount = 0;
+    isProfit = true;
   } else if (isBuy) {
     displayAmount = -trade.amount;
     isProfit = false;
@@ -42,6 +45,7 @@ function TradeCard({ trade, formatDate }: TradeCardProps) {
     if (isSell) return { label: 'Sold', class: 'sold', icon: null };
     if (trade.result === 'won') return { label: 'Won', class: 'won', icon: <CheckCircle size={14} /> };
     if (trade.result === 'lost') return { label: 'Lost', class: 'lost', icon: <XCircle size={14} /> };
+    if (trade.result === 'refunded') return { label: 'Refunded', class: 'refunded', icon: <CheckCircle size={14} /> };
     return { label: 'Pending', class: 'pending', icon: <Clock size={14} /> };
   };
   

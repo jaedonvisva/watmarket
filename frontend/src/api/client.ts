@@ -13,6 +13,7 @@ import type {
   SuggestedLine,
   SuggestedLineCreateRequest,
   SuggestionReviewRequest,
+  LineInvalidateResponse,
 } from './types';
 
 // Re-export all types for backwards compatibility
@@ -75,6 +76,9 @@ export const linesApi = {
   
   resolve: (id: string, correct_outcome: 'yes' | 'no') =>
     api.post(`/lines/${id}/resolve`, { correct_outcome }),
+  
+  invalidate: (id: string) =>
+    api.post<LineInvalidateResponse>(`/lines/${id}/invalidate`),
 };
 
 export const betsApi = {

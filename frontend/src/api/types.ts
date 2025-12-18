@@ -37,9 +37,17 @@ export interface Line {
   no_pool: number;
   volume: number;
   resolved: boolean;
-  correct_outcome: 'yes' | 'no' | null;
+  correct_outcome: 'yes' | 'no' | 'invalid' | null;
   created_at: string;
   odds: LineOdds;
+}
+
+export interface LineInvalidateResponse {
+  line_id: string;
+  correct_outcome: 'invalid';
+  users_refunded: number;
+  total_refunded: number;
+  resolved_at: string;
 }
 
 export interface PriceHistoryPoint {
@@ -93,7 +101,7 @@ export interface SellSharesResponse {
 // ============ Trade Types ============
 
 export type TradeType = 'buy' | 'sell';
-export type TradeResult = 'won' | 'lost' | null;
+export type TradeResult = 'won' | 'lost' | 'refunded' | null;
 
 export interface Trade {
   id: string;
@@ -112,11 +120,13 @@ export interface Trade {
 
 // ============ Position Types ============
 
+export type ResolutionOutcome = 'yes' | 'no' | 'invalid';
+
 export interface Position {
   line_id: string;
   line_title: string;
   line_resolved: boolean;
-  line_correct_outcome: Outcome | null;
+  line_correct_outcome: ResolutionOutcome | null;
   outcome: Outcome;
   total_shares: number;
   total_cost: number;

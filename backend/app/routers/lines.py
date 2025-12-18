@@ -5,11 +5,11 @@ from datetime import datetime, timezone
 
 from app.database import get_supabase_admin
 from app.models.schemas import (
-    LineCreate, LineResponse, LineResolve, UserResponse, PriceHistoryPoint
+    LineCreate, LineResponse, LineResolve, LineInvalidateResponse, UserResponse, PriceHistoryPoint
 )
 from app.services.auth import get_current_user, get_current_admin
 from app.services.odds import calculate_odds
-from app.services.resolver import resolve_line
+from app.services.resolver import resolve_line, invalidate_line
 
 router = APIRouter(prefix="/lines", tags=["lines"])
 
@@ -143,4 +143,43 @@ async def resolve_prediction_line(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Resolution failed: {str(e)}"
+        )
+
+
+@router.post("/{line_id}/invalidate", response_model=LineInvalidateResponse)
+async def invalidate_prediction_line(
+    line_id: UUID,
+    current_user: UserResponse = Depends(get_current_admin)
+):
+    """
+    Invalidate (cancel) a prediction line and refund users (admin only).
+    
+    This will:
+    1. Mark the line as resolved with outcome='invalid'
+    2. Calculate net investment for each user (buys - sells)
+    3. Refund each user their net investment (clamped to >= 0)
+    4. Create refund transaction records
+    5. Zero out the liquidity pools
+    
+    Trade history is preserved. Users who profited from sells
+    before invalidation keep their profits (refund = 0).
+    """
+    try:
+        result = invalidate_line(line_id, resolved_by=current_user.id)
+        return LineInvalidateResponse(
+            line_id=result["line_id"],
+            correct_outcome="invalid",
+            users_refunded=result["users_refunded"],
+            total_refunded=result["total_refunded"],
+            resolved_at=result["resolved_at"]
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Invalidation failed: {str(e)}"
         )

@@ -609,6 +609,12 @@ button[type="submit"]:disabled {
   border: 1px solid rgba(255, 215, 0, 0.2);
 }
 
+.status-badge.invalid {
+  background: rgba(156, 163, 175, 0.1);
+  color: #9ca3af;
+  border: 1px solid rgba(156, 163, 175, 0.2);
+}
+
 /* Hide spin buttons */
 input[type=number]::-webkit-outer-spin-button,
 input[type=number]::-webkit-inner-spin-button {
@@ -2742,6 +2748,10 @@ textarea.form-input {
   border-left: 3px solid var(--text-muted);
 }
 
+.trade-card.refunded {
+  border-left: 3px solid #9ca3af;
+}
+
 .trade-card-main {
   display: flex;
   align-items: center;
@@ -2853,6 +2863,10 @@ textarea.form-input {
 
 .trade-status.sold {
   color: var(--text-muted);
+}
+
+.trade-status.refunded {
+  color: #9ca3af;
 }
 
 .trade-expand-btn {

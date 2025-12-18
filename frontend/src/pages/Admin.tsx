@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import type { Line, AdminBet } from '../api/client';
 import { linesApi, betsApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -75,7 +76,37 @@ export default function Admin() {
       await fetchLines();
       closeModal();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Resolution failed');
+      const detail = axios.isAxiosError(err) ? (err.response?.data as any)?.detail : null;
+      setError(detail || (err instanceof Error ? err.message : 'Resolution failed'));
+    } finally {
+      setResolving(null);
+    }
+  };
+
+  const handleInvalidate = async (lineId: string) => {
+    const confirmed = confirm(
+      'INVALIDATE this market?\n\n' +
+      'This will:\n' +
+      '• Cancel the market permanently\n' +
+      '• Refund each user their net investment (buys - sells)\n' +
+      '• Users who profited from sells keep their profits\n\n' +
+      'This action cannot be undone.'
+    );
+    if (!confirmed) return;
+    
+    setResolving(lineId);
+    try {
+      const result = await linesApi.invalidate(lineId);
+      alert(
+        `Market invalidated successfully!\n\n` +
+        `Users refunded: ${result.data.users_refunded}\n` +
+        `Total refunded: ${result.data.total_refunded.toLocaleString()} GOOS`
+      );
+      await fetchLines();
+      closeModal();
+    } catch (err) {
+      const detail = axios.isAxiosError(err) ? (err.response?.data as any)?.detail : null;
+      setError(detail || (err instanceof Error ? err.message : 'Invalidation failed'));
     } finally {
       setResolving(null);
     }
@@ -289,6 +320,27 @@ export default function Admin() {
                     Resolve NO
                   </button>
                 </div>
+                
+                {/* Invalidate Option */}
+                <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
+                  <h4 style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Cancel Market</h4>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
+                    Use this if the market is ambiguous, invalid, or cannot be resolved fairly.
+                    Users will be refunded their net investment.
+                  </p>
+                  <button
+                    className="btn-resolve invalid"
+                    onClick={() => handleInvalidate(selectedLine.line.id)}
+                    disabled={resolving === selectedLine.line.id}
+                    style={{ 
+                      background: 'var(--bg-tertiary)', 
+                      color: 'var(--text-secondary)',
+                      border: '1px solid var(--border)'
+                    }}
+                  >
+                    Invalidate & Refund
+                  </button>
+                </div>
               </div>
             )}
 
@@ -299,6 +351,11 @@ export default function Admin() {
                   This market resolved to <strong className={selectedLine.line.correct_outcome}>
                     {selectedLine.line.correct_outcome.toUpperCase()}
                   </strong>
+                  {selectedLine.line.correct_outcome === 'invalid' && (
+                    <span style={{ display: 'block', marginTop: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                      Market was cancelled. Users were refunded their net investment.
+                    </span>
+                  )}
                 </p>
               </div>
             )}
