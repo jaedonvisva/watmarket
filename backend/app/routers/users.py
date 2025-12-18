@@ -32,20 +32,45 @@ async def register(user_data: UserCreate):
             )
         
         # Get the created user profile
+        # Get the created user profile
         admin_client = get_supabase_admin()
-        user_result = admin_client.table("users").select("*").eq("id", str(auth_response.user.id)).single().execute()
+        try:
+            user_result = admin_client.table("users").select("*").eq("id", str(auth_response.user.id)).single().execute()
+            user_data_db = user_result.data
+        except Exception as e:
+            # If profile doesn't exist (trigger failed or missing), create it manually
+            if "PGRST116" in str(e) or "0 rows" in str(e):
+                print("Trigger failed to create profile, creating manually.")
+                new_user = admin_client.table("users").insert({
+                    "id": str(auth_response.user.id),
+                    "email": user_data.email,
+                    "karma_balance": 1000,
+                    "is_admin": False
+                }).execute()
+                user_data_db = new_user.data[0]
+            else:
+                raise e
         
         return AuthResponse(
             access_token=auth_response.session.access_token,
-            user=UserResponse(**user_result.data)
+            user=UserResponse(**user_data_db)
         )
         
     except HTTPException:
         raise
     except Exception as e:
+        error_msg = str(e)
+        print(f"Registration error: {error_msg}")
+        
+        if "User already registered" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="An account with this email already exists. Please log in instead."
+            )
+
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail=error_msg
         )
 
 
@@ -53,6 +78,16 @@ async def register(user_data: UserCreate):
 async def login(credentials: UserLogin):
     """Login with email and password."""
     try:
+        # First check if user exists in our database
+        admin_client = get_supabase_admin()
+        user_check = admin_client.table("users").select("id").eq("email", credentials.email).execute()
+        
+        if not user_check.data or len(user_check.data) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="No account found with this email. Please register first."
+            )
+        
         supabase = get_supabase_client()
         
         auth_response = supabase.auth.sign_in_with_password({
@@ -67,7 +102,6 @@ async def login(credentials: UserLogin):
             )
         
         # Get user profile
-        admin_client = get_supabase_admin()
         user_result = admin_client.table("users").select("*").eq("id", str(auth_response.user.id)).single().execute()
         
         return AuthResponse(
@@ -78,6 +112,13 @@ async def login(credentials: UserLogin):
     except HTTPException:
         raise
     except Exception as e:
+        error_msg = str(e)
+        # Check if user doesn't exist
+        if "Invalid login credentials" in error_msg or "User not found" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="No account found with this email. Please register first."
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials"

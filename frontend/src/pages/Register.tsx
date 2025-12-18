@@ -24,8 +24,8 @@ export default function Register() {
     try {
       await register(email, password);
       navigate('/');
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Registration failed';
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.detail || err.message || 'Registration failed';
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -36,7 +36,21 @@ export default function Register() {
     <div className="auth-container">
       <h1>Register</h1>
       <form onSubmit={handleSubmit}>
-        {error && <div className="error">{error}</div>}
+        {error && (
+          <div className="error">
+            {error.includes('already exists') ? (
+              <>
+                An account with this email already exists. Please{' '}
+                <Link to="/login" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                  log in
+                </Link>{' '}
+                instead.
+              </>
+            ) : (
+              error
+            )}
+          </div>
+        )}
         <div className="form-group">
           <label htmlFor="email">Email</label>
           <input
