@@ -1,23 +1,27 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Request
 from typing import List
 
-from app.database import get_supabase_client, get_supabase_admin
+from app.database import get_anon_client, get_service_client
 from app.models.schemas import (
     UserCreate, UserLogin, UserResponse, AuthResponse, TradeHistoryItem
 )
-from app.services.auth import get_current_user
+from app.services.auth import get_current_user, get_current_user_with_token, AuthenticatedUser
+from app.rate_limit import limiter, RATE_LIMITS
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
-async def register(user_data: UserCreate):
+@limiter.limit(RATE_LIMITS["register"])
+async def register(request: Request, user_data: UserCreate):
     """
     Register a new user account.
     Creates auth user and profile with starting GOOS balance (1000).
+    
+    Rate limited: 3 requests per minute per IP to prevent abuse.
     """
     try:
-        supabase = get_supabase_client()
+        supabase = get_anon_client()
         
         # Create auth user (trigger will create profile)
         auth_response = supabase.auth.sign_up({
@@ -31,17 +35,17 @@ async def register(user_data: UserCreate):
                 detail="Failed to create user"
             )
         
-        # Get the created user profile
-        # Get the created user profile
-        admin_client = get_supabase_admin()
+        # Get the created user profile - use service client to bypass RLS
+        # (JWT token from sign_up may not have immediate access)
+        service_client = get_service_client()
         try:
-            user_result = admin_client.table("users").select("*").eq("id", str(auth_response.user.id)).single().execute()
+            user_result = service_client.table("users").select("*").eq("id", str(auth_response.user.id)).single().execute()
             user_data_db = user_result.data
         except Exception as e:
             # If profile doesn't exist (trigger failed or missing), create it manually
             if "PGRST116" in str(e) or "0 rows" in str(e):
                 print("Trigger failed to create profile, creating manually.")
-                new_user = admin_client.table("users").insert({
+                new_user = service_client.table("users").insert({
                     "id": str(auth_response.user.id),
                     "email": user_data.email,
                     "karma_balance": 1000,
@@ -75,12 +79,17 @@ async def register(user_data: UserCreate):
 
 
 @router.post("/login", response_model=AuthResponse)
-async def login(credentials: UserLogin):
-    """Login with email and password."""
+@limiter.limit(RATE_LIMITS["login"])
+async def login(request: Request, credentials: UserLogin):
+    """
+    Login with email and password.
+    
+    Rate limited: 5 requests per minute per IP to prevent brute force attacks.
+    """
     try:
         # First check if user exists in our database
-        admin_client = get_supabase_admin()
-        user_check = admin_client.table("users").select("id").eq("email", credentials.email).execute()
+        service_client = get_service_client()
+        user_check = service_client.table("users").select("id").eq("email", credentials.email).execute()
         
         if not user_check.data or len(user_check.data) == 0:
             raise HTTPException(
@@ -88,7 +97,7 @@ async def login(credentials: UserLogin):
                 detail="No account found with this email. Please register first."
             )
         
-        supabase = get_supabase_client()
+        supabase = get_anon_client()
         
         auth_response = supabase.auth.sign_in_with_password({
             "email": credentials.email,
@@ -101,8 +110,8 @@ async def login(credentials: UserLogin):
                 detail="Invalid credentials"
             )
         
-        # Get user profile
-        user_result = admin_client.table("users").select("*").eq("id", str(auth_response.user.id)).single().execute()
+        # Get user profile using service client
+        user_result = service_client.table("users").select("*").eq("id", str(auth_response.user.id)).single().execute()
         
         return AuthResponse(
             access_token=auth_response.session.access_token,
@@ -132,18 +141,21 @@ async def get_me(current_user: UserResponse = Depends(get_current_user)):
 
 
 @router.get("/me/trades", response_model=List[TradeHistoryItem])
-async def get_my_trades(current_user: UserResponse = Depends(get_current_user)):
+async def get_my_trades(auth: AuthenticatedUser = Depends(get_current_user_with_token)):
     """Get current user's trade history - buys and sells merged."""
-    admin_client = get_supabase_admin()
+    # Use service_client for all queries
+    service_client = get_service_client()
+    current_user = auth.user
     
     trades = []
     
     # Get all bets (buys)
-    bets_result = admin_client.table("bets")\
+    bets_result = service_client.table("bets")\
         .select("*, lines(id, title, resolved, correct_outcome)")\
         .eq("user_id", str(current_user.id))\
         .order("created_at", desc=True)\
         .execute()
+
     
     for bet in bets_result.data:
         line = bet.get("lines", {}) or {}
@@ -183,7 +195,7 @@ async def get_my_trades(current_user: UserResponse = Depends(get_current_user)):
         ))
     
     # Get sell transactions
-    sells_result = admin_client.table("transactions")\
+    sells_result = service_client.table("transactions")\
         .select("*")\
         .eq("user_id", str(current_user.id))\
         .eq("type", "sell")\
@@ -194,7 +206,7 @@ async def get_my_trades(current_user: UserResponse = Depends(get_current_user)):
     unique_sell_line_ids = list(dict.fromkeys(sell_line_ids))
     sell_line_titles: dict[str, str] = {}
     if unique_sell_line_ids:
-        lines_result = admin_client.table("lines")\
+        lines_result = service_client.table("lines")\
             .select("id, title")\
             .in_("id", unique_sell_line_ids)\
             .execute()
