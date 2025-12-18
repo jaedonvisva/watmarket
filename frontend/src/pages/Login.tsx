@@ -52,6 +52,7 @@ export default function Login() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            placeholder="yourwatiam@uwaterloo.ca"
             required
           />
         </div>

@@ -14,6 +14,12 @@ export default function Register() {
     e.preventDefault();
     setError('');
 
+    // Validate email domain
+    if (!email.toLowerCase().endsWith('@uwaterloo.ca')) {
+      setError('Please use your UWaterloo email address (@uwaterloo.ca)');
+      return;
+    }
+
     if (password.length < 6) {
       setError('Password must be at least 6 characters');
       return;
@@ -58,6 +64,7 @@ export default function Register() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            placeholder="yourwatiam@uwaterloo.ca"
             required
           />
         </div>
