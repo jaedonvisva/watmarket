@@ -313,18 +313,20 @@ async def get_portfolio_summary(
     """
     Get overall portfolio summary with P&L calculations.
     
-    P&L Calculation (Wealthsimple-style):
-    -------------------------------------
-    We track all money flows from trading activity:
+    P&L Calculation (Transaction Ledger-based):
+    --------------------------------------------
+    Trading P&L is computed directly from the transactions table:
+      sum(transactions.amount) for types: bet, sell, payout, refund
     
-    Realized P&L = (payouts from wins) + (sell proceeds) + (refunds) - (cost basis of those positions)
-    Unrealized P&L = (current liquidation value of open positions) - (cost of open positions)
-    Total P&L = Realized + Unrealized
+    This is the authoritative source of truth because:
+    - Every bet deducts from balance (negative amount)
+    - Every sell/payout/refund adds to balance (positive amount)
+    - The net sum = realized P&L from all closed activity
     
-    This properly accounts for:
-    - Partial sells (reduces cost basis proportionally)
-    - Refunds from invalidated markets
-    - Multiple buys at different prices
+    Unrealized P&L is computed from open positions:
+      (current liquidation value) - (cost basis of open positions)
+    
+    Total P&L = Realized (from ledger, excluding open positions) + Unrealized
     """
     admin_client = get_supabase_admin()
     
@@ -334,18 +336,12 @@ async def get_portfolio_summary(
         .eq("user_id", str(current_user.id))\
         .execute()
     
-    # Get sell transactions to track realized gains from sells
-    sells_result = admin_client.table("transactions")\
-        .select("*")\
+    # Get all trading transactions to compute realized P&L from ledger
+    # Types: bet (negative), sell (positive), payout (positive), refund (positive)
+    transactions_result = admin_client.table("transactions")\
+        .select("amount, type")\
         .eq("user_id", str(current_user.id))\
-        .eq("type", "sell")\
-        .execute()
-    
-    # Get refund transactions from invalidated markets
-    refunds_result = admin_client.table("transactions")\
-        .select("*")\
-        .eq("user_id", str(current_user.id))\
-        .eq("type", "refund")\
+        .in_("type", ["bet", "sell", "payout", "refund"])\
         .execute()
     
     # Step 1: Aggregate bets into positions by (line_id, outcome)
@@ -364,61 +360,29 @@ async def get_portfolio_summary(
                 "outcome": bet["outcome"],
                 "total_shares": 0,
                 "total_cost": 0,
-                "total_payout": 0,
             }
         
         shares = bet.get("shares") or 0
         positions_map[key]["total_shares"] += shares
         positions_map[key]["total_cost"] += bet["stake"]
-        
-        if bet.get("payout") is not None:
-            positions_map[key]["total_payout"] += bet["payout"]
     
-    # Step 2: Calculate sell proceeds per position
-    # Sells reduce your position but give you cash back
-    sell_proceeds_by_line = {}
-    for tx in sells_result.data:
-        line_id = tx.get("reference_id")
-        if line_id:
-            sell_proceeds_by_line[line_id] = sell_proceeds_by_line.get(line_id, 0) + tx["amount"]
-    
-    # Step 3: Calculate refunds (from invalidated markets)
-    total_refunds = sum(tx["amount"] for tx in refunds_result.data)
-    
-    # Step 4: Compute metrics from aggregated positions
+    # Step 2: Compute positions metrics (active vs resolved)
     active_invested = 0  # Cost basis of currently open positions
     active_value = 0     # Current liquidation value of open positions
-    realized_pnl = 0     # P&L from closed positions (resolved + sold)
     active_count = 0
     resolved_count = 0
     
     for key, pos in positions_map.items():
         line = pos["line"]
-        line_id = key[0]
         is_resolved = line["resolved"]
-        correct_outcome = line.get("correct_outcome")
-        total_cost = pos["total_cost"]
         total_shares = pos["total_shares"]
-        
-        # Get sell proceeds for this line (if any)
-        line_sell_proceeds = sell_proceeds_by_line.get(line_id, 0)
+        total_cost = pos["total_cost"]
         
         if is_resolved:
             resolved_count += 1
-            if correct_outcome == "invalid":
-                # Invalidated market: refund handled separately via transactions
-                # The cost was refunded, so realized P&L from this position is 0
-                # (refunds are tracked in total_refunds)
-                pass
-            else:
-                # Normal resolution: payout - cost = realized P&L
-                realized_pnl += pos["total_payout"] - total_cost
+            # Resolved positions: P&L already captured in transactions (payout/refund)
         else:
-            # Active position
-            # Net cost = original cost - sell proceeds (sells return some of your investment)
-            net_cost = total_cost - line_sell_proceeds
-            
-            # Compute current liquidation value
+            # Active position: compute current liquidation value
             if total_shares > 0:
                 position_value = calculate_cpmm_sell(
                     total_shares,
@@ -429,25 +393,30 @@ async def get_portfolio_summary(
             else:
                 position_value = 0
             
-            active_invested += max(net_cost, 0)  # Can't be negative
+            active_invested += total_cost
             active_value += position_value
             active_count += 1
-            
-            # Add realized P&L from partial sells on this position
-            # If you sold some shares, that's realized gain/loss
-            if line_sell_proceeds > 0:
-                # Proportional cost basis for sold shares
-                # This is approximate - ideally we'd track FIFO/avg cost per share
-                realized_pnl += line_sell_proceeds  # Proceeds are pure realized (cost already counted)
+    
+    # Step 3: Compute P&L from transaction ledger
+    # Net of all trading transactions = realized P&L from closed positions
+    # But we need to exclude the cost of OPEN positions (those are unrealized)
+    ledger_net = sum(tx["amount"] for tx in transactions_result.data)
+    
+    # ledger_net includes:
+    #   - All bet costs (negative) including open positions
+    #   - All payouts/sells/refunds (positive) from closed positions
+    # 
+    # To get realized P&L only, we add back the cost of open positions
+    # (since those bets haven't resolved yet)
+    realized_pnl = ledger_net + active_invested
     
     # Unrealized P&L = current value of open positions - cost of open positions
     unrealized_pnl = active_value - active_invested
     
-    # Total P&L = realized (from resolved + sells) + unrealized (from open positions)
-    # Note: refunds are break-even by design (you get back what you put in)
+    # Total P&L = realized + unrealized
     total_pnl = realized_pnl + unrealized_pnl
     
-    # P&L percent is relative to total money ever put at risk
+    # P&L percent: relative to total money ever risked (all bet stakes)
     total_cost_basis = sum(pos["total_cost"] for pos in positions_map.values())
     total_pnl_percent = (total_pnl / total_cost_basis * 100) if total_cost_basis > 0 else 0
     
