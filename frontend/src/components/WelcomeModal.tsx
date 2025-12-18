@@ -35,7 +35,7 @@ export default function WelcomeModal({ onComplete }: WelcomeModalProps) {
       content: (
         <>
           <p className="welcome-intro">
-            You've been given <strong>10,000 GOOS</strong> (play money) to predict outcomes on questions that matter to you.
+            You've been given <strong>1,000 GOOS</strong> (play money) to predict outcomes on questions that matter to you.
           </p>
           <div className="welcome-highlight">
             <Coins size={24} />
