@@ -18,8 +18,8 @@ export default function Login() {
     try {
       await login(email, password);
       navigate('/');
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Login failed';
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.detail || err.message || 'Login failed';
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -30,7 +30,21 @@ export default function Login() {
     <div className="auth-container">
       <h1>Login</h1>
       <form onSubmit={handleSubmit}>
-        {error && <div className="error">{error}</div>}
+        {error && (
+          <div className="error">
+            {error.includes('No account found') ? (
+              <>
+                No account found with this email.{' '}
+                <Link to="/register" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                  Register here
+                </Link>
+                .
+              </>
+            ) : (
+              error
+            )}
+          </div>
+        )}
         <div className="form-group">
           <label htmlFor="email">Email</label>
           <input
@@ -38,6 +52,7 @@ export default function Login() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            placeholder="yourwatiam@uwaterloo.ca"
             required
           />
         </div>
