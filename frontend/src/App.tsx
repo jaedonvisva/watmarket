@@ -8,6 +8,7 @@ import WelcomeModal, { useOnboarding } from './components/WelcomeModal';
 import { useCurrentTime } from './hooks/useCurrentTime';
 import logoDark from './assets/watmarket_dark.png';
 import logoLight from './assets/watmarket_light.png';
+import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Markets from './pages/Markets';
@@ -105,13 +106,34 @@ function Layout({ children }: { children: React.ReactNode }) {
   const { showWelcome, completeOnboarding } = useOnboarding();
   
   if (isLoading) return <LoadingSpinner fullScreen />;
-  if (!user) return <Navigate to="/login" />;
+  if (!user) return <Navigate to="/" />;
   
   return (
     <div className="app-layout">
       <Sidebar />
       <main className="main-content">
         {children}
+      </main>
+      {showWelcome && <WelcomeModal onComplete={completeOnboarding} />}
+    </div>
+  );
+}
+
+function HomePage() {
+  const { user, isLoading } = useAuth();
+  const { showWelcome, completeOnboarding } = useOnboarding();
+  
+  if (isLoading) return <LoadingSpinner fullScreen />;
+  
+  if (!user) {
+    return <Landing />;
+  }
+  
+  return (
+    <div className="app-layout">
+      <Sidebar />
+      <main className="main-content">
+        <Dashboard />
       </main>
       {showWelcome && <WelcomeModal onComplete={completeOnboarding} />}
     </div>
@@ -125,7 +147,8 @@ function AppRoutes() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         
-        <Route path="/" element={<Layout><Dashboard /></Layout>} />
+        <Route path="/" element={<HomePage />} />
+        <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
         <Route path="/markets" element={<Layout><Markets /></Layout>} />
         <Route path="/markets/:id" element={<Layout><LineDetail /></Layout>} />
         <Route path="/lines/:id" element={<Layout><LineDetail /></Layout>} />
