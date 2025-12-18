@@ -82,11 +82,11 @@ export const linesApi = {
 };
 
 export const betsApi = {
-  place: (line_id: string, outcome: 'yes' | 'no', stake: number) =>
-    api.post<Bet>('/bets/place', { line_id, outcome, stake }),
+  place: (line_id: string, outcome: 'yes' | 'no', stake: number, min_shares_out: number) =>
+    api.post<Bet>('/bets/place', { line_id, outcome, stake, min_shares_out }),
   
-  sell: (line_id: string, outcome: 'yes' | 'no', shares: number) =>
-    api.post<SellSharesResponse>('/bets/sell', { line_id, outcome, shares }),
+  sell: (line_id: string, outcome: 'yes' | 'no', shares: number, min_amount_out: number) =>
+    api.post<SellSharesResponse>('/bets/sell', { line_id, outcome, shares, min_amount_out }),
   
   getMy: () => api.get<Bet[]>('/bets/my'),
   

@@ -74,8 +74,10 @@ export default function Markets() {
               <div className="market-header">
                 <h3>{line.title}</h3>
                 <div className="market-meta">
-                  <span className={`status-badge ${line.resolved ? 'resolved' : isOpen(line) ? 'open' : 'closed'}`}>
-                    {line.resolved ? 'Resolved' : isOpen(line) ? 'Open' : 'Closed'}
+                  <span className={`status-badge ${line.resolved ? (line.correct_outcome === 'invalid' ? 'cancelled' : 'resolved') : isOpen(line) ? 'open' : 'closed'}`}>
+                    {line.resolved 
+                      ? (line.correct_outcome === 'invalid' ? 'Cancelled' : 'Resolved')
+                      : isOpen(line) ? 'Open' : 'Closed'}
                   </span>
                   <span>• Ends {formatDate(line.closes_at)}</span>
                 </div>

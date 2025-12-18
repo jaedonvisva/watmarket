@@ -225,9 +225,9 @@ export default function Admin() {
                     </span>
                   </td>
                   <td>
-                    <span className={`status-badge ${status}`}>
+                    <span className={`status-badge ${line.correct_outcome === 'invalid' ? 'cancelled' : status}`}>
                       {status === 'resolved' && line.correct_outcome 
-                        ? `${line.correct_outcome.toUpperCase()}` 
+                        ? (line.correct_outcome === 'invalid' ? 'CANCELLED' : line.correct_outcome.toUpperCase())
                         : status.charAt(0).toUpperCase() + status.slice(1)}
                     </span>
                   </td>

@@ -63,7 +63,7 @@ export default function LineDetail() {
 
   // Calculate user's position for the selected outcome
   const userPosition = useMemo(() => {
-    const positionBets = myBets.filter(b => b.outcome === outcome && !b.payout);
+    const positionBets = myBets.filter(b => b.outcome === outcome && (b.payout === null || b.payout === undefined));
     const totalShares = positionBets.reduce((sum, b) => sum + (b.shares || 0), 0);
     const totalCost = positionBets.reduce((sum, b) => sum + b.stake, 0);
     return { totalShares, totalCost };
@@ -89,7 +89,8 @@ export default function LineDetail() {
     setError('');
 
     try {
-      await betsApi.place(line.id, outcome, finalStake);
+      const minSharesOut = getEstShares * (1 - DEFAULTS.SLIPPAGE_TOLERANCE);
+      await betsApi.place(line.id, outcome, finalStake, minSharesOut);
       await refetchData();
       toast.success(`Bought ${getEstShares.toFixed(0)} ${outcome.toUpperCase()} shares for ${finalStake} GOOS`);
       setStake(100);
@@ -116,7 +117,8 @@ export default function LineDetail() {
 
     try {
       const value = getSellValue(sellShares, outcome);
-      await betsApi.sell(line.id, outcome, sellShares);
+      const minAmountOut = value * (1 - DEFAULTS.SLIPPAGE_TOLERANCE);
+      await betsApi.sell(line.id, outcome, sellShares, minAmountOut);
       await refetchData();
       toast.success(`Sold ${sellShares.toFixed(0)} ${outcome.toUpperCase()} shares for ${value.toFixed(0)} GOOS`);
       setSellShares(0);

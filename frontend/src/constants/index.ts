@@ -21,6 +21,7 @@ export const UI = {
 export const DEFAULTS = {
   INITIAL_STAKE: 100,
   INITIAL_SHARES: 100,
+  SLIPPAGE_TOLERANCE: 0.02,  // 2% default slippage tolerance
 } as const;
 
 // Time periods for chart

@@ -87,6 +87,7 @@ class BetCreate(BaseModel):
     line_id: UUID
     outcome: Literal["yes", "no"]
     stake: int = Field(..., gt=0)
+    min_shares_out: float = Field(..., gt=0, description="Minimum shares to receive (slippage protection)")
 
 
 class SellSharesRequest(BaseModel):
@@ -94,6 +95,7 @@ class SellSharesRequest(BaseModel):
     line_id: UUID
     outcome: Literal["yes", "no"]
     shares: float = Field(..., gt=0)
+    min_amount_out: float = Field(..., gt=0, description="Minimum GOOS to receive (slippage protection)")
 
 
 class SellSharesResponse(BaseModel):

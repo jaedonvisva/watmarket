@@ -23,12 +23,13 @@ async def place_bet(
     admin_client = get_supabase_admin()
     
     try:
-        # Call atomic bet placement function
+        # Call atomic bet placement function with slippage protection
         result = admin_client.rpc('place_bet_atomic', {
             'p_user_id': str(current_user.id),
             'p_line_id': str(bet_data.line_id),
             'p_outcome': bet_data.outcome,
-            'p_stake': bet_data.stake
+            'p_stake': bet_data.stake,
+            'p_min_shares_out': bet_data.min_shares_out
         }).execute()
         
         if not result.data:
@@ -68,6 +69,10 @@ async def place_bet(
             raise HTTPException(status_code=404, detail="User not found")
         elif "Invalid outcome" in error_msg:
             raise HTTPException(status_code=400, detail="Invalid outcome: must be yes or no")
+        elif "Slippage exceeded" in error_msg:
+            raise HTTPException(status_code=400, detail=error_msg)
+        elif "min_shares_out must be positive" in error_msg:
+            raise HTTPException(status_code=400, detail="min_shares_out must be positive")
         else:
             raise HTTPException(status_code=500, detail=f"Failed to place bet: {error_msg}")
 
@@ -84,12 +89,13 @@ async def sell_shares(
     admin_client = get_supabase_admin()
     
     try:
-        # Call atomic sell function
+        # Call atomic sell function with slippage protection
         result = admin_client.rpc('sell_shares_atomic', {
             'p_user_id': str(current_user.id),
             'p_line_id': str(sell_data.line_id),
             'p_outcome': sell_data.outcome,
-            'p_shares': sell_data.shares
+            'p_shares': sell_data.shares,
+            'p_min_amount_out': sell_data.min_amount_out
         }).execute()
         
         if not result.data:
@@ -118,6 +124,10 @@ async def sell_shares(
             raise HTTPException(status_code=400, detail="Invalid outcome: must be yes or no")
         elif "Sell amount too small" in error_msg:
             raise HTTPException(status_code=400, detail="Sell amount too small")
+        elif "Slippage exceeded" in error_msg:
+            raise HTTPException(status_code=400, detail=error_msg)
+        elif "min_amount_out must be positive" in error_msg:
+            raise HTTPException(status_code=400, detail="min_amount_out must be positive")
         else:
             raise HTTPException(status_code=500, detail=f"Failed to sell shares: {error_msg}")
 
