@@ -2,20 +2,26 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Coins, ArrowRight } from 'lucide-react';
 
-const ONBOARDING_KEY = 'watmarket_onboarding_complete';
+const ONBOARDING_KEY_PREFIX = 'watmarket_onboarding_complete';
 
-export function useOnboarding() {
+const getOnboardingKey = (userId: string) => `${ONBOARDING_KEY_PREFIX}:${userId}`;
+
+export function useOnboarding(userId?: string | null) {
   const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
-    const completed = localStorage.getItem(ONBOARDING_KEY);
-    if (!completed) {
-      setShowWelcome(true);
+    if (!userId) {
+      setShowWelcome(false);
+      return;
     }
-  }, []);
+
+    const completed = localStorage.getItem(getOnboardingKey(userId));
+    setShowWelcome(!completed);
+  }, [userId]);
 
   const completeOnboarding = () => {
-    localStorage.setItem(ONBOARDING_KEY, 'true');
+    if (!userId) return;
+    localStorage.setItem(getOnboardingKey(userId), 'true');
     setShowWelcome(false);
   };
 

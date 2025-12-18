@@ -103,7 +103,7 @@ function Sidebar() {
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
-  const { showWelcome, completeOnboarding } = useOnboarding();
+  const { showWelcome, completeOnboarding } = useOnboarding(user?.id);
   
   if (isLoading) return <LoadingSpinner fullScreen />;
   if (!user) return <Navigate to="/" />;
@@ -121,7 +121,7 @@ function Layout({ children }: { children: React.ReactNode }) {
 
 function HomePage() {
   const { user, isLoading } = useAuth();
-  const { showWelcome, completeOnboarding } = useOnboarding();
+  const { showWelcome, completeOnboarding } = useOnboarding(user?.id);
   
   if (isLoading) return <LoadingSpinner fullScreen />;
   
