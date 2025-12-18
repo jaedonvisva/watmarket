@@ -5,6 +5,7 @@ python-dotenv
 pydantic
 pydantic-settings
 python-jose[cryptography]
+slowapi
 pytest
 pytest-asyncio
 pytest-mock

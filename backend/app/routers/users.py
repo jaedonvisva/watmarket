@@ -1,23 +1,27 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Request
 from typing import List
 
-from app.database import get_supabase_client, get_supabase_admin
+from app.database import get_anon_client, get_jwt_client
 from app.models.schemas import (
     UserCreate, UserLogin, UserResponse, AuthResponse, TradeHistoryItem
 )
-from app.services.auth import get_current_user
+from app.services.auth import get_current_user, get_current_user_with_token, AuthenticatedUser
+from app.rate_limit import limiter, RATE_LIMITS
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
-async def register(user_data: UserCreate):
+@limiter.limit(RATE_LIMITS["register"])
+async def register(request: Request, user_data: UserCreate):
     """
     Register a new user account.
     Creates auth user and profile with starting GOOS balance (1000).
+    
+    Rate limited: 3 requests per minute per IP to prevent abuse.
     """
     try:
-        supabase = get_supabase_client()
+        supabase = get_anon_client()
         
         # Create auth user (trigger will create profile)
         auth_response = supabase.auth.sign_up({
@@ -31,9 +35,9 @@ async def register(user_data: UserCreate):
                 detail="Failed to create user"
             )
         
-        # Get the created user profile
-        admin_client = get_supabase_admin()
-        user_result = admin_client.table("users").select("*").eq("id", str(auth_response.user.id)).single().execute()
+        # Get the created user profile using the new session's JWT
+        user_client = get_jwt_client(auth_response.session.access_token)
+        user_result = user_client.table("users").select("*").eq("id", str(auth_response.user.id)).single().execute()
         
         return AuthResponse(
             access_token=auth_response.session.access_token,
@@ -50,10 +54,15 @@ async def register(user_data: UserCreate):
 
 
 @router.post("/login", response_model=AuthResponse)
-async def login(credentials: UserLogin):
-    """Login with email and password."""
+@limiter.limit(RATE_LIMITS["login"])
+async def login(request: Request, credentials: UserLogin):
+    """
+    Login with email and password.
+    
+    Rate limited: 5 requests per minute per IP to prevent brute force attacks.
+    """
     try:
-        supabase = get_supabase_client()
+        supabase = get_anon_client()
         
         auth_response = supabase.auth.sign_in_with_password({
             "email": credentials.email,
@@ -66,9 +75,9 @@ async def login(credentials: UserLogin):
                 detail="Invalid credentials"
             )
         
-        # Get user profile
-        admin_client = get_supabase_admin()
-        user_result = admin_client.table("users").select("*").eq("id", str(auth_response.user.id)).single().execute()
+        # Get user profile using the session's JWT (respects RLS)
+        user_client = get_jwt_client(auth_response.session.access_token)
+        user_result = user_client.table("users").select("*").eq("id", str(auth_response.user.id)).single().execute()
         
         return AuthResponse(
             access_token=auth_response.session.access_token,
@@ -91,14 +100,16 @@ async def get_me(current_user: UserResponse = Depends(get_current_user)):
 
 
 @router.get("/me/trades", response_model=List[TradeHistoryItem])
-async def get_my_trades(current_user: UserResponse = Depends(get_current_user)):
+async def get_my_trades(auth: AuthenticatedUser = Depends(get_current_user_with_token)):
     """Get current user's trade history - buys and sells merged."""
-    admin_client = get_supabase_admin()
+    # Use JWT-scoped client to respect RLS
+    user_client = get_jwt_client(auth.token)
+    current_user = auth.user
     
     trades = []
     
-    # Get all bets (buys)
-    bets_result = admin_client.table("bets")\
+    # Get all bets (buys) - RLS ensures user only sees their own
+    bets_result = user_client.table("bets")\
         .select("*, lines(id, title, resolved, correct_outcome)")\
         .eq("user_id", str(current_user.id))\
         .order("created_at", desc=True)\
@@ -141,8 +152,8 @@ async def get_my_trades(current_user: UserResponse = Depends(get_current_user)):
             payout=payout
         ))
     
-    # Get sell transactions
-    sells_result = admin_client.table("transactions")\
+    # Get sell transactions - RLS ensures user only sees their own
+    sells_result = user_client.table("transactions")\
         .select("*")\
         .eq("user_id", str(current_user.id))\
         .eq("type", "sell")\
@@ -153,7 +164,8 @@ async def get_my_trades(current_user: UserResponse = Depends(get_current_user)):
     unique_sell_line_ids = list(dict.fromkeys(sell_line_ids))
     sell_line_titles: dict[str, str] = {}
     if unique_sell_line_ids:
-        lines_result = admin_client.table("lines")\
+        # Lines are publicly readable, so this works with JWT client
+        lines_result = user_client.table("lines")\
             .select("id, title")\
             .in_("id", unique_sell_line_ids)\
             .execute()

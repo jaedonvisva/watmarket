@@ -3,11 +3,11 @@ from typing import List
 from uuid import UUID
 from datetime import datetime, timezone
 
-from app.database import get_supabase_admin
+from app.database import get_service_client, get_jwt_client
 from app.models.schemas import (
     LineCreate, LineResponse, LineResolve, LineInvalidateResponse, UserResponse, PriceHistoryPoint
 )
-from app.services.auth import get_current_user, get_current_admin
+from app.services.auth import get_current_user, get_current_admin, get_current_user_with_token, AuthenticatedUser
 from app.services.odds import calculate_odds
 from app.services.resolver import resolve_line, invalidate_line
 
@@ -35,12 +35,13 @@ def _enrich_line_with_odds(line_data: dict) -> LineResponse:
 @router.get("/{line_id}/history", response_model=List[PriceHistoryPoint])
 async def get_line_history(
     line_id: UUID,
-    current_user: UserResponse = Depends(get_current_user)
+    auth: AuthenticatedUser = Depends(get_current_user_with_token)
 ):
     """Get price history for a line."""
-    admin_client = get_supabase_admin()
+    # Use JWT-scoped client - price_history is publicly readable
+    user_client = get_jwt_client(auth.token)
     
-    result = admin_client.table("price_history")\
+    result = user_client.table("price_history")\
         .select("*")\
         .eq("line_id", str(line_id))\
         .order("created_at", desc=False)\
@@ -52,15 +53,16 @@ async def get_line_history(
 @router.get("", response_model=List[LineResponse])
 async def get_lines(
     resolved: bool | None = None,
-    current_user: UserResponse = Depends(get_current_user)
+    auth: AuthenticatedUser = Depends(get_current_user_with_token)
 ):
     """
     Get all prediction lines with dynamic odds.
     Optionally filter by resolved status.
     """
-    admin_client = get_supabase_admin()
+    # Use JWT-scoped client - lines are publicly readable
+    user_client = get_jwt_client(auth.token)
     
-    query = admin_client.table("lines").select("*").order("created_at", desc=True)
+    query = user_client.table("lines").select("*").order("created_at", desc=True)
     
     if resolved is not None:
         query = query.eq("resolved", resolved)
@@ -73,12 +75,13 @@ async def get_lines(
 @router.get("/{line_id}", response_model=LineResponse)
 async def get_line(
     line_id: UUID,
-    current_user: UserResponse = Depends(get_current_user)
+    auth: AuthenticatedUser = Depends(get_current_user_with_token)
 ):
     """Get a specific prediction line with odds."""
-    admin_client = get_supabase_admin()
+    # Use JWT-scoped client - lines are publicly readable
+    user_client = get_jwt_client(auth.token)
     
-    result = admin_client.table("lines").select("*").eq("id", str(line_id)).single().execute()
+    result = user_client.table("lines").select("*").eq("id", str(line_id)).single().execute()
     
     if not result.data:
         raise HTTPException(
@@ -95,7 +98,7 @@ async def create_line(
     current_user: UserResponse = Depends(get_current_admin)
 ):
     """Create a new prediction line (admin only)."""
-    admin_client = get_supabase_admin()
+    admin_client = get_service_client()
     
     # Validate closes_at is in the future
     if line_data.closes_at <= datetime.now(timezone.utc):

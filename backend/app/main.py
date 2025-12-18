@@ -1,13 +1,20 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.routers import users, lines, bets, suggestions
+from app.rate_limit import limiter
 
 app = FastAPI(
     title="WatMarket Prediction Market API",
     description="University-specific prediction market using GOOS tokens",
     version="1.0.0"
 )
+
+# Rate limiting setup
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS middleware for frontend
 app.add_middleware(

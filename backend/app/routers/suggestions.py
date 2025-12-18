@@ -3,12 +3,12 @@ from typing import List
 from uuid import UUID
 from datetime import datetime, timezone
 
-from app.database import get_supabase_admin
+from app.database import get_service_client, get_jwt_client
 from app.models.schemas import (
     SuggestedLineCreate, SuggestedLineResponse, SuggestedLineReview,
     LineResponse, UserResponse
 )
-from app.services.auth import get_current_user, get_current_admin
+from app.services.auth import get_current_user, get_current_admin, get_current_user_with_token, AuthenticatedUser
 from app.services.odds import calculate_odds
 
 router = APIRouter(prefix="/suggestions", tags=["suggestions"])
@@ -34,13 +34,15 @@ def _format_suggestion(data: dict) -> SuggestedLineResponse:
 @router.post("", response_model=SuggestedLineResponse, status_code=status.HTTP_201_CREATED)
 async def create_suggestion(
     suggestion: SuggestedLineCreate,
-    current_user: UserResponse = Depends(get_current_user)
+    auth: AuthenticatedUser = Depends(get_current_user_with_token)
 ):
     """
     Submit a new line suggestion.
     Any authenticated user can suggest a line for admin review.
     """
-    admin_client = get_supabase_admin()
+    # Use JWT-scoped client for user operation
+    user_client = get_jwt_client(auth.token)
+    current_user = auth.user
     
     # Validate closes_at is in the future
     if suggestion.closes_at <= datetime.now(timezone.utc):
@@ -49,7 +51,7 @@ async def create_suggestion(
             detail="closes_at must be in the future"
         )
     
-    result = admin_client.table("suggested_lines").insert({
+    result = user_client.table("suggested_lines").insert({
         "user_id": str(current_user.id),
         "title": suggestion.title,
         "description": suggestion.description,
@@ -62,15 +64,17 @@ async def create_suggestion(
 
 @router.get("/my", response_model=List[SuggestedLineResponse])
 async def get_my_suggestions(
-    current_user: UserResponse = Depends(get_current_user)
+    auth: AuthenticatedUser = Depends(get_current_user_with_token)
 ):
     """
     Get all suggestions submitted by the current user.
     Shows status (pending/approved/rejected) and rejection reasons.
     """
-    admin_client = get_supabase_admin()
+    # Use JWT-scoped client - RLS ensures user only sees their own
+    user_client = get_jwt_client(auth.token)
+    current_user = auth.user
     
-    result = admin_client.table("suggested_lines")\
+    result = user_client.table("suggested_lines")\
         .select("*")\
         .eq("user_id", str(current_user.id))\
         .order("created_at", desc=True)\
@@ -87,7 +91,7 @@ async def get_pending_suggestions(
     Get all pending suggestions (admin only).
     Admins can review and approve/reject these.
     """
-    admin_client = get_supabase_admin()
+    admin_client = get_service_client()
     
     result = admin_client.table("suggested_lines")\
         .select("*")\
@@ -106,7 +110,7 @@ async def get_all_suggestions(
     """
     Get all suggestions with optional status filter (admin only).
     """
-    admin_client = get_supabase_admin()
+    admin_client = get_service_client()
     
     query = admin_client.table("suggested_lines")\
         .select("*")\
@@ -137,7 +141,7 @@ async def review_suggestion(
     - Requires a rejection_reason
     - Updates the suggestion status
     """
-    admin_client = get_supabase_admin()
+    admin_client = get_service_client()
     
     # Get the suggestion
     suggestion_result = admin_client.table("suggested_lines")\
@@ -220,15 +224,22 @@ async def review_suggestion(
 @router.get("/{suggestion_id}", response_model=SuggestedLineResponse)
 async def get_suggestion(
     suggestion_id: UUID,
-    current_user: UserResponse = Depends(get_current_user)
+    auth: AuthenticatedUser = Depends(get_current_user_with_token)
 ):
     """
     Get a specific suggestion.
     Users can only view their own suggestions. Admins can view any.
     """
-    admin_client = get_supabase_admin()
+    current_user = auth.user
     
-    result = admin_client.table("suggested_lines")\
+    # For admins, use service role to bypass RLS and see all suggestions
+    # For regular users, use JWT-scoped client (RLS will enforce ownership)
+    if current_user.is_admin:
+        client = get_service_client()
+    else:
+        client = get_jwt_client(auth.token)
+    
+    result = client.table("suggested_lines")\
         .select("*")\
         .eq("id", str(suggestion_id))\
         .single()\
@@ -240,7 +251,7 @@ async def get_suggestion(
             detail="Suggestion not found"
         )
     
-    # Check access
+    # Double-check access for non-admins (belt-and-suspenders with RLS)
     if not current_user.is_admin and str(result.data["user_id"]) != str(current_user.id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

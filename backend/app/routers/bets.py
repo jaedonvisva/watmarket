@@ -1,26 +1,31 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Request
 from typing import List
 from uuid import UUID
 from datetime import datetime, timezone
 
-from app.database import get_supabase_admin
+from app.database import get_service_client, get_jwt_client
 from app.models.schemas import BetCreate, BetResponse, UserResponse, PositionResponse, PortfolioSummary, SellSharesRequest, SellSharesResponse
-from app.services.auth import get_current_user
+from app.services.auth import get_current_user, get_current_user_with_token, AuthenticatedUser
 from app.services.odds import calculate_cpmm_buy, calculate_cpmm_sell, calculate_odds
+from app.rate_limit import limiter, RATE_LIMITS
 
 router = APIRouter(prefix="/bets", tags=["bets"])
 
 
 @router.post("/place", response_model=BetResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit(RATE_LIMITS["place_bet"])
 async def place_bet(
+    request: Request,
     bet_data: BetCreate,
     current_user: UserResponse = Depends(get_current_user)
 ):
     """
     Place a bet (Buy Shares) on a prediction line using CPMM.
     Uses atomic database function to prevent race conditions.
+    
+    Rate limited: 30 requests per minute per IP to prevent market manipulation.
     """
-    admin_client = get_supabase_admin()
+    admin_client = get_service_client()
     
     try:
         # Call atomic bet placement function with slippage protection
@@ -78,15 +83,19 @@ async def place_bet(
 
 
 @router.post("/sell", response_model=SellSharesResponse)
+@limiter.limit(RATE_LIMITS["sell"])
 async def sell_shares(
+    request: Request,
     sell_data: SellSharesRequest,
     current_user: UserResponse = Depends(get_current_user)
 ):
     """
     Sell shares from a position using CPMM.
     Uses atomic database function to prevent race conditions.
+    
+    Rate limited: 30 requests per minute per IP to prevent market manipulation.
     """
-    admin_client = get_supabase_admin()
+    admin_client = get_service_client()
     
     try:
         # Call atomic sell function with slippage protection
@@ -136,12 +145,14 @@ async def sell_shares(
 
 @router.get("/my", response_model=List[BetResponse])
 async def get_my_bets(
-    current_user: UserResponse = Depends(get_current_user)
+    auth: AuthenticatedUser = Depends(get_current_user_with_token)
 ):
     """Get all bets placed by the current user."""
-    admin_client = get_supabase_admin()
+    # Use JWT-scoped client to respect RLS
+    user_client = get_jwt_client(auth.token)
+    current_user = auth.user
     
-    result = admin_client.table("bets")\
+    result = user_client.table("bets")\
         .select("*")\
         .eq("user_id", str(current_user.id))\
         .order("created_at", desc=True)\
@@ -173,12 +184,14 @@ async def get_my_bets(
 @router.get("/line/{line_id}", response_model=List[BetResponse])
 async def get_bets_for_line(
     line_id: UUID,
-    current_user: UserResponse = Depends(get_current_user)
+    auth: AuthenticatedUser = Depends(get_current_user_with_token)
 ):
     """Get current user's bets for a specific line."""
-    admin_client = get_supabase_admin()
+    # Use JWT-scoped client to respect RLS
+    user_client = get_jwt_client(auth.token)
+    current_user = auth.user
     
-    result = admin_client.table("bets")\
+    result = user_client.table("bets")\
         .select("*")\
         .eq("user_id", str(current_user.id))\
         .eq("line_id", str(line_id))\
@@ -198,7 +211,7 @@ async def get_all_bets_for_line(
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    admin_client = get_supabase_admin()
+    admin_client = get_service_client()
     
     # Get bets with user info
     result = admin_client.table("bets")\
@@ -220,16 +233,18 @@ async def get_all_bets_for_line(
 
 @router.get("/positions", response_model=List[PositionResponse])
 async def get_positions(
-    current_user: UserResponse = Depends(get_current_user)
+    auth: AuthenticatedUser = Depends(get_current_user_with_token)
 ):
     """
     Get aggregated positions for the current user.
     Groups bets by (line_id, outcome) and calculates current value based on market prices.
     """
-    admin_client = get_supabase_admin()
+    # Use JWT-scoped client to respect RLS
+    user_client = get_jwt_client(auth.token)
+    current_user = auth.user
     
-    # Get all bets with line data
-    result = admin_client.table("bets")\
+    # Get all bets with line data - RLS ensures user only sees their own bets
+    result = user_client.table("bets")\
         .select("*, lines(*)")\
         .eq("user_id", str(current_user.id))\
         .execute()
@@ -320,7 +335,7 @@ async def get_positions(
 
 @router.get("/portfolio", response_model=PortfolioSummary)
 async def get_portfolio_summary(
-    current_user: UserResponse = Depends(get_current_user)
+    auth: AuthenticatedUser = Depends(get_current_user_with_token)
 ):
     """
     Get overall portfolio summary with P&L calculations.
@@ -340,17 +355,20 @@ async def get_portfolio_summary(
     
     Total P&L = Realized (from ledger, excluding open positions) + Unrealized
     """
-    admin_client = get_supabase_admin()
+    # Use JWT-scoped client to respect RLS
+    user_client = get_jwt_client(auth.token)
+    current_user = auth.user
     
-    # Get all bets with line data
-    bets_result = admin_client.table("bets")\
+    # Get all bets with line data - RLS ensures user only sees their own
+    bets_result = user_client.table("bets")\
         .select("*, lines(*)")\
         .eq("user_id", str(current_user.id))\
         .execute()
     
     # Get all trading transactions to compute realized P&L from ledger
     # Types: bet (negative), sell (positive), payout (positive), refund (positive)
-    transactions_result = admin_client.table("transactions")\
+    # RLS ensures user only sees their own transactions
+    transactions_result = user_client.table("transactions")\
         .select("amount, type")\
         .eq("user_id", str(current_user.id))\
         .in_("type", ["bet", "sell", "payout", "refund"])\

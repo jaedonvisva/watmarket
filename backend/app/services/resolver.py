@@ -1,7 +1,7 @@
 from uuid import UUID
 from typing import Dict
 
-from app.database import get_supabase_admin
+from app.database import get_service_client
 
 
 def resolve_line(line_id: UUID, correct_outcome: str) -> Dict:
@@ -18,7 +18,7 @@ def resolve_line(line_id: UUID, correct_outcome: str) -> Dict:
     if correct_outcome not in ('yes', 'no'):
         raise ValueError(f"Invalid outcome: {correct_outcome}. Must be 'yes' or 'no'")
     
-    admin_client = get_supabase_admin()
+    admin_client = get_service_client()
     
     try:
         # Call atomic resolution function
@@ -65,7 +65,7 @@ def invalidate_line(line_id: UUID, resolved_by: UUID = None) -> Dict:
     
     Returns summary of invalidation.
     """
-    admin_client = get_supabase_admin()
+    admin_client = get_service_client()
     
     try:
         # Call atomic invalidation function
