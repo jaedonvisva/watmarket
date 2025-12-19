@@ -13,6 +13,8 @@ from slowapi.errors import RateLimitExceeded
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+from app.config import get_settings
+
 
 def get_client_ip(request: Request) -> str:
     """
@@ -21,11 +23,21 @@ def get_client_ip(request: Request) -> str:
     Checks X-Forwarded-For header first (for requests behind proxy/load balancer),
     falls back to direct client IP.
     """
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        # X-Forwarded-For can contain multiple IPs; first is the client
-        return forwarded.split(",")[0].strip()
-    return get_remote_address(request)
+    settings = get_settings()
+
+    remote_ip = get_remote_address(request)
+
+    # Only trust X-Forwarded-For if explicitly enabled AND the request comes from
+    # a trusted proxy. Otherwise, user-supplied XFF allows trivial spoofing.
+    if settings.trust_x_forwarded_for:
+        trusted = {ip.strip() for ip in settings.trusted_proxy_ips.split(",") if ip.strip()}
+        if trusted and remote_ip in trusted:
+            forwarded = request.headers.get("X-Forwarded-For")
+            if forwarded:
+                # X-Forwarded-For can contain multiple IPs; first is the client
+                return forwarded.split(",")[0].strip()
+
+    return remote_ip
 
 
 # Initialize the limiter with IP-based key function

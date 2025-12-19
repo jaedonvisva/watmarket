@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from datetime import datetime
 from typing import Optional, Literal
 from uuid import UUID
+
+import math
 
 
 # ============ User Schemas ============
@@ -89,6 +91,13 @@ class BetCreate(BaseModel):
     stake: int = Field(..., gt=0)
     min_shares_out: float = Field(..., gt=0, description="Minimum shares to receive (slippage protection)")
 
+    @field_validator("min_shares_out")
+    @classmethod
+    def _min_shares_out_must_be_finite(cls, v: float) -> float:
+        if not math.isfinite(v):
+            raise ValueError("min_shares_out must be a finite number")
+        return v
+
 
 class SellSharesRequest(BaseModel):
     """Request to sell shares from a position."""
@@ -96,6 +105,13 @@ class SellSharesRequest(BaseModel):
     outcome: Literal["yes", "no"]
     shares: float = Field(..., gt=0)
     min_amount_out: int = Field(..., gt=0, description="Minimum GOOS to receive (slippage protection)")
+
+    @field_validator("shares")
+    @classmethod
+    def _shares_must_be_finite(cls, v: float) -> float:
+        if not math.isfinite(v):
+            raise ValueError("shares must be a finite number")
+        return v
 
 
 class SellSharesResponse(BaseModel):
