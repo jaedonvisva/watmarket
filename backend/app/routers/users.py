@@ -39,11 +39,24 @@ async def register(request: Request, user_data: UserCreate):
         # (JWT token from sign_up may not have immediate access)
         service_client = get_service_client()
         try:
+            # Wait a brief moment for trigger? No, just try to select.
             user_result = service_client.table("users").select("*").eq("id", str(auth_response.user.id)).single().execute()
-            user_data_db = user_result.data
+            
+            if user_result.data:
+                # Profile exists (created by trigger), but has default display_name.
+                # Update it with the requested display_name.
+                update_result = service_client.table("users").update({
+                    "display_name": user_data.display_name
+                }).eq("id", str(auth_response.user.id)).execute()
+                
+                user_data_db = update_result.data[0]
+            else:
+                # Should be caught by exception below, but just in case
+                raise Exception("Profile not found")
+                
         except Exception as e:
             # If profile doesn't exist (trigger failed or missing), create it manually
-            if "PGRST116" in str(e) or "0 rows" in str(e):
+            if "PGRST116" in str(e) or "0 rows" in str(e) or "Profile not found" in str(e):
                 print("Trigger failed to create profile, creating manually.")
                 new_user = service_client.table("users").insert({
                     "id": str(auth_response.user.id),
