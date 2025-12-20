@@ -14,6 +14,8 @@ import type {
   SuggestedLineCreateRequest,
   SuggestionReviewRequest,
   LineInvalidateResponse,
+  LeaderboardResponse,
+  UserLeaderboardStats,
 } from './types';
 
 // Re-export all types for backwards compatibility
@@ -120,4 +122,19 @@ export const suggestionsApi = {
 
   review: (id: string, data: SuggestionReviewRequest) =>
     api.post<SuggestedLine>(`/suggestions/${id}/review`, data),
+};
+
+export const leaderboardApi = {
+  getLeaderboard: (limit?: number, minMarkets?: number) =>
+    api.get<LeaderboardResponse>('/leaderboard', {
+      params: {
+        ...(limit && { limit }),
+        ...(minMarkets && { min_markets: minMarkets }),
+      },
+    }),
+
+  getMyStats: (minMarkets?: number) =>
+    api.get<UserLeaderboardStats>('/leaderboard/me', {
+      params: minMarkets ? { min_markets: minMarkets } : {},
+    }),
 };

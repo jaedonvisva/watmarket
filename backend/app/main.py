@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from app.routers import users, lines, bets, suggestions
+from app.routers import users, lines, bets, suggestions, leaderboard
 from app.rate_limit import limiter
 
 app = FastAPI(
@@ -36,6 +36,7 @@ app.include_router(users.router)
 app.include_router(lines.router)
 app.include_router(bets.router)
 app.include_router(suggestions.router)
+app.include_router(leaderboard.router)
 
 
 @app.get("/")

@@ -182,3 +182,34 @@ export interface SuggestionReviewRequest {
   rejection_reason?: string;
   initial_liquidity?: number;
 }
+
+// ============ Leaderboard Types ============
+
+export interface LeaderboardEntry {
+  rank: number;
+  user_id: string;
+  display_name: string;
+  skill_score: number;
+  total_profit: number;
+  markets_participated: number;
+  win_rate: number;
+  avg_return_per_market: number;
+  is_current_user: boolean;
+}
+
+export interface LeaderboardResponse {
+  entries: LeaderboardEntry[];
+  total_participants: number;
+  min_markets_required: number;
+}
+
+export interface UserLeaderboardStats {
+  rank: number | null;
+  skill_score: number;
+  total_profit: number;
+  markets_participated: number;
+  win_rate: number;
+  avg_return_per_market: number;
+  qualifies: boolean;
+  min_markets_required: number;
+}
