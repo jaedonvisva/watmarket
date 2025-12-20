@@ -48,6 +48,7 @@ async def register(request: Request, user_data: UserCreate):
                 new_user = service_client.table("users").insert({
                     "id": str(auth_response.user.id),
                     "email": user_data.email,
+                    "display_name": user_data.display_name,
                     "karma_balance": 1000,
                     "is_admin": False
                 }).execute()
@@ -70,6 +71,12 @@ async def register(request: Request, user_data: UserCreate):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="An account with this email already exists. Please log in instead."
+            )
+            
+        if "users_display_name_key" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This username is already taken. Please choose another one."
             )
 
         raise HTTPException(

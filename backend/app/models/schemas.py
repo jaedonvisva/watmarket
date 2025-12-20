@@ -14,6 +14,7 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=6)
+    display_name: str = Field(..., min_length=3, max_length=30, pattern="^[a-zA-Z0-9_]+$")
 
 
 class UserLogin(UserBase):
@@ -23,6 +24,7 @@ class UserLogin(UserBase):
 class UserResponse(BaseModel):
     id: UUID
     email: str
+    display_name: str
     karma_balance: int
     is_admin: bool
     created_at: datetime

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 export default function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
@@ -25,10 +26,20 @@ export default function Register() {
       return;
     }
 
+    if (displayName.length < 3 || displayName.length > 30) {
+      setError('Display name must be between 3 and 30 characters');
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_]+$/.test(displayName)) {
+      setError('Display name can only contain letters, numbers, and underscores');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await register(email, password);
+      await register(email, password, displayName);
       navigate('/');
     } catch (err: any) {
       const errorMessage = err.response?.data?.detail || err.message || 'Registration failed';
@@ -57,6 +68,22 @@ export default function Register() {
             )}
           </div>
         )}
+        <div className="form-group">
+          <label htmlFor="displayName">Display Name</label>
+          <input
+            id="displayName"
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder="CoolTrader123"
+            required
+            minLength={3}
+            maxLength={30}
+            pattern="[a-zA-Z0-9_]+"
+            title="Letters, numbers, and underscores only"
+          />
+          <small className="form-help">Visible on leaderboards. Letters, numbers, and underscores only.</small>
+        </div>
         <div className="form-group">
           <label htmlFor="email">Email</label>
           <input
