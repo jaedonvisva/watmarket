@@ -107,13 +107,26 @@ async def create_line(
             detail="closes_at must be in the future"
         )
     
+    # Calculate pool sizes based on initial_probability
+    if line_data.initial_probability is not None:
+        # Use initial_probability to skew the pools
+        # Total depth = 2 * initial_liquidity (same as 50/50 case)
+        p = line_data.initial_probability
+        total_depth = 2 * line_data.initial_liquidity
+        yes_pool = (1 - p) * total_depth
+        no_pool = p * total_depth
+    else:
+        # Default 50/50 split
+        yes_pool = line_data.initial_liquidity
+        no_pool = line_data.initial_liquidity
+    
     result = admin_client.table("lines").insert({
         "title": line_data.title,
         "description": line_data.description,
         "closes_at": line_data.closes_at.isoformat(),
         "created_by": str(current_user.id),
-        "yes_pool": line_data.initial_liquidity,
-        "no_pool": line_data.initial_liquidity
+        "yes_pool": yes_pool,
+        "no_pool": no_pool
     }).execute()
     
     return _enrich_line_with_odds(result.data[0])
@@ -135,7 +148,7 @@ async def resolve_prediction_line(
     4. Create payout transactions
     """
     try:
-        result = resolve_line(line_id, resolution.correct_outcome)
+        result = resolve_line(line_id, resolution.correct_outcome, resolved_by=current_user.id)
         return result
     except ValueError as e:
         raise HTTPException(

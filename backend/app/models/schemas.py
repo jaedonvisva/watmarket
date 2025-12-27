@@ -1,7 +1,8 @@
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from datetime import datetime
-from typing import Optional, Literal
+from typing import Optional, Literal, Union
 from uuid import UUID
+from decimal import Decimal
 
 import math
 
@@ -47,6 +48,15 @@ class LineBase(BaseModel):
 
 class LineCreate(LineBase):
     initial_liquidity: float = 100.0
+    initial_probability: Optional[float] = None
+    
+    @field_validator("initial_probability")
+    @classmethod
+    def _validate_initial_probability(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None:
+            if not (0.01 <= v <= 0.99):
+                raise ValueError("initial_probability must be between 0.01 and 0.99")
+        return v
 
 
 class LineOdds(BaseModel):
@@ -61,9 +71,9 @@ class LineResponse(BaseModel):
     title: str
     description: Optional[str]
     closes_at: datetime
-    yes_pool: float
-    no_pool: float
-    volume: float = 0
+    yes_pool: Union[float, Decimal]
+    no_pool: Union[float, Decimal]
+    volume: Union[float, Decimal] = 0
     resolved: bool
     correct_outcome: Optional[Literal["yes", "no", "invalid"]]
     created_at: datetime
@@ -131,11 +141,11 @@ class BetResponse(BaseModel):
     line_id: UUID
     outcome: Literal["yes", "no"]
     stake: int
-    shares: Optional[float] = None
+    shares: Optional[Union[float, Decimal]] = None
     created_at: datetime
-    potential_payout: Optional[float] = None
-    buy_price: Optional[float] = None
-    payout: Optional[float] = None
+    potential_payout: Optional[Union[float, Decimal]] = None
+    buy_price: Optional[Union[float, Decimal]] = None
+    payout: Optional[Union[float, Decimal]] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -219,8 +229,8 @@ class TokenPayload(BaseModel):
 
 
 class PriceHistoryPoint(BaseModel):
-    yes_price: float
-    no_price: float
+    yes_price: Union[float, Decimal]
+    no_price: Union[float, Decimal]
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -254,3 +264,12 @@ class SuggestedLineReview(BaseModel):
     action: Literal["approve", "reject"]
     rejection_reason: Optional[str] = None
     initial_liquidity: float = 100.0
+    initial_probability: Optional[float] = None
+    
+    @field_validator("initial_probability")
+    @classmethod
+    def _validate_initial_probability(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None:
+            if not (0.01 <= v <= 0.99):
+                raise ValueError("initial_probability must be between 0.01 and 0.99")
+        return v

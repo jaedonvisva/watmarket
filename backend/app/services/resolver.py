@@ -4,7 +4,7 @@ from typing import Dict
 from app.database import get_service_client
 
 
-def resolve_line(line_id: UUID, correct_outcome: str) -> Dict:
+def resolve_line(line_id: UUID, correct_outcome: str, resolved_by: UUID = None) -> Dict:
     """
     Resolve a prediction line and distribute payouts.
     Uses atomic database function to prevent race conditions and double-resolution.
@@ -21,10 +21,11 @@ def resolve_line(line_id: UUID, correct_outcome: str) -> Dict:
     admin_client = get_service_client()
     
     try:
-        # Call atomic resolution function
+        # Call atomic resolution function with resolved_by for audit trail
         result = admin_client.rpc('resolve_line_atomic', {
             'p_line_id': str(line_id),
-            'p_correct_outcome': correct_outcome
+            'p_correct_outcome': correct_outcome,
+            'p_resolved_by': str(resolved_by) if resolved_by else None
         }).execute()
         
         if not result.data:

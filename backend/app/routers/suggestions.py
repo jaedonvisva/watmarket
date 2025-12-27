@@ -195,14 +195,27 @@ async def review_suggestion(
                 detail="The suggested close date has passed. Please reject with reason or ask user to resubmit."
             )
         
+        # Calculate pool sizes based on initial_probability
+        if review.initial_probability is not None:
+            # Use initial_probability to skew the pools
+            # Total depth = 2 * initial_liquidity (same as 50/50 case)
+            p = review.initial_probability
+            total_depth = 2 * review.initial_liquidity
+            yes_pool = (1 - p) * total_depth
+            no_pool = p * total_depth
+        else:
+            # Default 50/50 split
+            yes_pool = review.initial_liquidity
+            no_pool = review.initial_liquidity
+        
         # Create the line
         line_result = admin_client.table("lines").insert({
             "title": suggestion["title"],
             "description": suggestion["description"],
             "closes_at": suggestion["closes_at"],
             "created_by": str(current_user.id),
-            "yes_pool": review.initial_liquidity,
-            "no_pool": review.initial_liquidity
+            "yes_pool": yes_pool,
+            "no_pool": no_pool
         }).execute()
         
         new_line_id = line_result.data[0]["id"]

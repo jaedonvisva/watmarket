@@ -1,12 +1,17 @@
 from app.models.schemas import LineOdds
-from typing import Tuple
+from typing import Tuple, Union
+from decimal import Decimal
 
-def calculate_odds(yes_pool: float, no_pool: float) -> LineOdds:
+def calculate_odds(yes_pool: Union[float, Decimal], no_pool: Union[float, Decimal]) -> LineOdds:
     """
     Calculate CPMM price (probability).
     Price(Yes) = No / (Yes + No)
     Price(No) = Yes / (Yes + No)
     """
+    # Convert Decimal to float for calculations
+    yes_pool = float(yes_pool)
+    no_pool = float(no_pool)
+    
     # Avoid division by zero
     if yes_pool <= 0 or no_pool <= 0:
         # Default 50/50 if empty
@@ -31,14 +36,18 @@ def calculate_odds(yes_pool: float, no_pool: float) -> LineOdds:
 def calculate_cpmm_buy(
     investment: float,
     outcome: str,
-    yes_pool: float,
-    no_pool: float
+    yes_pool: Union[float, Decimal],
+    no_pool: Union[float, Decimal]
 ) -> Tuple[float, float, float]:
     """
     Calculate shares bought and new pool state using CPMM (k = y * n).
     
     Returns: (shares_bought, new_yes_pool, new_no_pool)
     """
+    # Convert Decimal to float for calculations
+    yes_pool = float(yes_pool)
+    no_pool = float(no_pool)
+    
     # Invariant k
     k = yes_pool * no_pool
     
@@ -65,8 +74,8 @@ def calculate_cpmm_buy(
 def _calculate_cost_to_buy_shares(
     shares: float,
     outcome: str,
-    yes_pool: float,
-    no_pool: float
+    yes_pool: Union[float, Decimal],
+    no_pool: Union[float, Decimal]
 ) -> float:
     """
     Calculate cost required to buy a specific number of shares.
@@ -76,6 +85,10 @@ def _calculate_cost_to_buy_shares(
     Where: new_pool_outcome = k / (pool_opposite + investment)
     Solving for investment gives a quadratic.
     """
+    # Convert Decimal to float for calculations
+    yes_pool = float(yes_pool)
+    no_pool = float(no_pool)
+    
     if shares <= 0:
         return 0.0
     
@@ -99,8 +112,8 @@ def _calculate_cost_to_buy_shares(
 def calculate_cpmm_sell(
     shares: float,
     outcome: str,
-    yes_pool: float,
-    no_pool: float
+    yes_pool: Union[float, Decimal],
+    no_pool: Union[float, Decimal]
 ) -> float:
     """
     Calculate amount received when selling shares.
@@ -112,6 +125,10 @@ def calculate_cpmm_sell(
     
     This guarantees buy/sell symmetry and eliminates subtle algebra bugs.
     """
+    # Convert Decimal to float for calculations
+    yes_pool = float(yes_pool)
+    no_pool = float(no_pool)
+    
     if shares <= 0:
         return 0.0
     
@@ -133,10 +150,14 @@ def calculate_cpmm_sell(
 def calculate_cpmm_sell_with_pools(
     shares: float,
     outcome: str,
-    yes_pool: float,
-    no_pool: float
+    yes_pool: Union[float, Decimal],
+    no_pool: Union[float, Decimal]
 ) -> Tuple[float, float, float]:
     """Calculate amount received and new pool state when selling shares."""
+    # Convert Decimal to float for calculations
+    yes_pool = float(yes_pool)
+    no_pool = float(no_pool)
+    
     if shares <= 0:
         return 0.0, yes_pool, no_pool
     
