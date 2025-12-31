@@ -25,8 +25,7 @@ The core goal of the project is to model real prediction-market dynamics (pricin
 
 - `frontend/`: React app
 - `backend/`: FastAPI app
-- `AUDIT_REPORT.md`: security/performance review and database migration guidance
-- `ROADMAP.md`: planned features
+- `AUDIT_CHECKLIST.md`: consolidated security + technical audit checklist with statuses
 
 ## Local development
 
