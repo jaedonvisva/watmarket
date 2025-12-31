@@ -9,6 +9,7 @@ import type {
   PortfolioSummary,
   PriceHistoryPoint,
   SellSharesResponse,
+  QuoteResponse,
   AuthResponse,
   SuggestedLine,
   SuggestedLineCreateRequest,
@@ -105,6 +106,9 @@ export const betsApi = {
   getPositions: () => api.get<Position[]>('/bets/positions'),
 
   getPortfolio: () => api.get<PortfolioSummary>('/bets/portfolio'),
+
+  getQuote: (line_id: string, outcome: 'yes' | 'no', amount: number, type: 'buy' | 'sell' | 'buy_amount' | 'buy_shares' | 'sell_shares') =>
+    api.get<QuoteResponse>('/bets/quote', { params: { line_id, outcome, amount, type } }),
 };
 
 export const suggestionsApi = {

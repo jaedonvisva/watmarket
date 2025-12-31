@@ -182,6 +182,21 @@ class PortfolioSummary(BaseModel):
     resolved_positions_count: int
 
 
+class QuoteResponse(BaseModel):
+    """Response for a price quote."""
+    line_id: UUID
+    outcome: Literal["yes", "no"]
+    type: Literal["buy", "sell"]
+    amount_in: float  # Stake (buy) or Shares (sell)
+    amount_out: float  # Shares (buy) or GOOS (sell)
+    price_per_share: float
+    fees: float = 0
+    new_pool_yes: float
+    new_pool_no: float
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ============ Transaction Schemas ============
 
 class TransactionResponse(BaseModel):

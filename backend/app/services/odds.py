@@ -71,7 +71,7 @@ def calculate_cpmm_buy(
         
         return shares_bought, new_yes_pool, new_no_pool
 
-def _calculate_cost_to_buy_shares(
+def calculate_cost_to_buy_shares(
     shares: float,
     outcome: str,
     yes_pool: Union[float, Decimal],
@@ -134,7 +134,7 @@ def calculate_cpmm_sell(
     
     # To sell `shares` of `outcome`, compute cost to buy `shares` of opposite outcome
     opposite_outcome = "no" if outcome == "yes" else "yes"
-    cost_to_buy_opposite = _calculate_cost_to_buy_shares(
+    cost_to_buy_opposite = calculate_cost_to_buy_shares(
         shares, opposite_outcome, yes_pool, no_pool
     )
     

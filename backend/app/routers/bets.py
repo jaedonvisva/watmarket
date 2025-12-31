@@ -4,9 +4,9 @@ from uuid import UUID
 from datetime import datetime, timezone
 
 from app.database import get_service_client, get_jwt_client
-from app.models.schemas import BetCreate, BetResponse, UserResponse, PositionResponse, PortfolioSummary, SellSharesRequest, SellSharesResponse
+from app.models.schemas import BetCreate, BetResponse, UserResponse, PositionResponse, PortfolioSummary, SellSharesRequest, SellSharesResponse, QuoteResponse
 from app.services.auth import get_current_user, get_current_user_with_token, AuthenticatedUser
-from app.services.odds import calculate_cpmm_buy, calculate_cpmm_sell, calculate_odds
+from app.services.odds import calculate_cpmm_buy, calculate_cpmm_sell, calculate_odds, calculate_cpmm_sell_with_pools, calculate_cost_to_buy_shares
 from app.rate_limit import limiter, RATE_LIMITS
 
 router = APIRouter(prefix="/bets", tags=["bets"])
@@ -141,6 +141,86 @@ async def sell_shares(
             raise HTTPException(status_code=400, detail="min_amount_out must be an integer")
         else:
             raise HTTPException(status_code=500, detail=f"Failed to sell shares: {error_msg}")
+
+
+@router.get("/quote", response_model=QuoteResponse)
+async def get_quote(
+    line_id: UUID,
+    outcome: str,
+    amount: float,
+    type: str,
+):
+    """
+    Get an authoritative quote for buying or selling shares.
+    - type="buy" or "buy_amount": amount is STAKE (GOOS), returns estimated shares.
+    - type="buy_shares": amount is SHARES, returns estimated cost (GOOS).
+    - type="sell" or "sell_shares": amount is SHARES, returns estimated GOOS.
+    """
+    if outcome not in ["yes", "no"]:
+        raise HTTPException(status_code=400, detail="Invalid outcome")
+    
+    valid_types = ["buy", "sell", "buy_amount", "buy_shares", "sell_shares"]
+    if type not in valid_types:
+        raise HTTPException(status_code=400, detail="Invalid quote type")
+        
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+
+    admin_client = get_service_client()
+    line_record = admin_client.table("lines").select("*").eq("id", str(line_id)).single().execute()
+    
+    if not line_record.data:
+        raise HTTPException(status_code=404, detail="Line not found")
+        
+    line = line_record.data
+    yes_pool = float(line["yes_pool"])
+    no_pool = float(line["no_pool"])
+    
+    # Normalized types
+    is_buy_amount = type in ["buy", "buy_amount"]
+    is_buy_shares = type == "buy_shares"
+    is_sell = type in ["sell", "sell_shares"]
+    
+    if is_buy_amount:
+        shares, new_yes, new_no = calculate_cpmm_buy(amount, outcome, yes_pool, no_pool)
+        return QuoteResponse(
+            line_id=line_id,
+            outcome=outcome,
+            type="buy",
+            amount_in=amount,
+            amount_out=shares,
+            price_per_share=amount / shares if shares > 0 else 0,
+            new_pool_yes=new_yes,
+            new_pool_no=new_no
+        )
+    elif is_buy_shares:
+        # Calculate cost for target shares
+        cost = calculate_cost_to_buy_shares(amount, outcome, yes_pool, no_pool)
+        # Verify pool impact with this cost
+        _, new_yes, new_no = calculate_cpmm_buy(cost, outcome, yes_pool, no_pool)
+        return QuoteResponse(
+            line_id=line_id,
+            outcome=outcome,
+            type="buy",
+            amount_in=amount, # Request was shares
+            amount_out=cost,  # Result is cost (GOOS)
+            price_per_share=cost / amount if amount > 0 else 0,
+            new_pool_yes=new_yes,
+            new_pool_no=new_no
+        )
+    else:  # sell
+        goos_out, new_yes, new_no = calculate_cpmm_sell_with_pools(amount, outcome, yes_pool, no_pool)
+        return QuoteResponse(
+            line_id=line_id,
+            outcome=outcome,
+            type="sell",
+            amount_in=amount,
+            amount_out=goos_out,
+            price_per_share=goos_out / amount if amount > 0 else 0,
+            new_pool_yes=new_yes,
+            new_pool_no=new_no
+        )
+
 
 
 @router.get("/my", response_model=List[BetResponse])

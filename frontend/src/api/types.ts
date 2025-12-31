@@ -100,6 +100,18 @@ export interface SellSharesResponse {
   remaining_shares: number;
 }
 
+export interface QuoteResponse {
+  line_id: string;
+  outcome: Outcome;
+  type: 'buy' | 'sell' | 'buy_amount' | 'buy_shares' | 'sell_shares';
+  amount_in: number;
+  amount_out: number;
+  price_per_share: number;
+  fees: number;
+  new_pool_yes: number;
+  new_pool_no: number;
+}
+
 // ============ Trade Types ============
 
 export type TradeType = 'buy' | 'sell';

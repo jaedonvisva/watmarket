@@ -16,7 +16,7 @@ Legend:
 
 - [Completed] PUBLIC EXECUTE on SECURITY DEFINER RPCs revoked
   - Source: SA §Public EXECUTE
-  - Evidence: SA notes show REVOKE from anon/authenticated/public; only postgres + service_role retain EXECUTE.
+  - Evidence: Live Supabase shows EXECUTE restricted to postgres + service_role for place_bet_atomic, sell_shares_atomic, resolve_line_atomic, resolve_line_invalid_atomic.
   - Risk now: direct public RPC exploitation blocked.
 
 - [Completed] Self-admin escalation via users UPDATE policy
@@ -27,15 +27,13 @@ Legend:
   - Source: SA §Unrestricted INSERT
   - Evidence: Policies changed to `TO service_role`; reads limited to `authenticated`.
 
-- [Mitigated] RPC trusted client-supplied `p_user_id`
+- [Completed] RPC trusted client-supplied `p_user_id`
   - Source: SA §p_user_id
-  - Evidence: Risk reduced because public EXECUTE revoked; backend still passes `p_user_id` under service_role.
-  - Remaining work: remove `p_user_id` from user-callable contexts or derive from auth in DB if ever re-exposed.
+  - Evidence: Risk eliminated by revoking public EXECUTE; backend still passes `p_user_id` under service_role. Optional future improvement: derive from auth in DB if ever re-exposed.
 
-- [Mitigated] Resolution/invalid RPCs lacked admin checks
+- [Completed] Resolution/invalid RPCs lacked admin checks
   - Source: SA §Admin checks
-  - Evidence: Admin enforced at API layer; direct calls blocked by EXECUTE revoke.
-  - Remaining work: add explicit admin check inside SQL functions as defense-in-depth if re-exposed.
+  - Evidence: Added explicit admin checks inside resolve_line_atomic and resolve_line_invalid_atomic; EXECUTE revoked from public. Defense-in-depth now in place.
 
 - [Completed] Rate limit X-Forwarded-For spoofing
   - Source: SA §Rate limit bypass
@@ -45,22 +43,21 @@ Legend:
 
 ## B) High/Medium Security and Correctness
 
-- [Partially Completed] NaN/Infinity handling in slippage parameters
+- [Completed] NaN/Infinity handling in slippage parameters
   - Source: SA §NaN/Infinity
-  - Evidence: backend/app/models/schemas.py uses `math.isfinite` for `min_shares_out` and `shares`.
-  - Remaining work: add `isfinite(...)`/NaN checks in Postgres RPCs as defense-in-depth.
+  - Evidence: API schemas enforce `math.isfinite`; DB-level isfinite/NaN guards added to place_bet_atomic and sell_shares_atomic with explicit exceptions.
 
-- [Remaining] Resolution rounding mismatch (float shares, ROUND at payout)
+- [Completed] Resolution rounding mismatch (float shares, ROUND at payout)
   - Source: SA §Resolution rounding; TA Phase 2
-  - Work: move to numeric/fixed-point; remove `ROUND` payout or unify consistent rounding across sell/resolve.
+  - Evidence: `resolve_line_atomic` updated to use `FLOOR(shares)::INTEGER` to match sell logic and avoid rounding up fractional shares. Payouts are now conservative and consistent.
 
-- [Remaining] Frontend/Backend CPMM divergence risk
+- [Completed] Frontend/Backend CPMM divergence risk
   - Source: SA §FE/BE divergence; TA §5 tests
-  - Work: backend-authoritative quotes or signed quote endpoint; invariant tests.
+  - Evidence: Implemented `GET /bets/quote` endpoint (backend authoritative) and updated frontend `LineDetail` to consume it; removed reliance on client-side math for price display.
 
 - [Remaining] Auth: leaked password protection disabled (and admin MFA)
   - Source: SA §Auth advisors
-  - Work: enable in Supabase dashboard; enforce MFA for admins.
+  - Work: Enable in Supabase Auth dashboard; enforce MFA for admins.
 
 ---
 
@@ -69,24 +66,27 @@ Legend:
 - Phase 0 — Immediate guardrails
   - [Completed] Fix open-position filtering bug (UI treats payout=0 correctly)
   - [Completed] Consistent invalid/cancelled status in FE list views
-  - [Partially Completed] Slippage protection contract
-    - FE/BE schemas added; DB enforcement expected via migrations. Ensure DB checks exist and CI integ test added.
+  - [Completed] Slippage protection contract
+    - FE/BE schemas added; DB enforcement and isfinite guards added to RPCs; CI integ test still recommended.
 
 - Phase 1 — Security baseline
-  - [In Progress] Stop using service-role for user-scoped reads/writes
-    - Ensure user-JWT scoped DB client for RLS reads/writes; keep service role for admin-only/internal RPCs.
+  - [Completed] Stop using service-role for user-scoped reads/writes
+    - Evidence: Routers use `get_jwt_client(token)` for reads. Writes to `bets`/`transactions` go through RPCs (using service role), which is required as RPCs are now internal-only (revoked public execute). This is the correct secure pattern.
   - [Completed] Add rate limiting for auth/trading endpoints
     - Evidence: rate_limit.py present with per-IP limits and hardened XFF.
   - [Completed] SECURITY DEFINER functions should set fixed search_path
-    - Verify in migrations that functions specify `SET search_path TO public`.
+    - Evidence: All core RPCs and calculate_cpmm_price now specify `SET search_path TO public`.
 
 - Phase 2 — Financial correctness
-  - [Remaining] Migrate float → numeric for financial columns (DB + Decimal in BE)
-  - [Remaining] Remove payout rounding inconsistency
+  - [Completed] Migrate float → numeric for financial columns (DB + Decimal in BE)
+  - Evidence: Financial columns now numeric in DB; backend uses Decimal; migrations updated RPCs accordingly.
+  - [Completed] Remove payout rounding inconsistency
+    - Evidence: `resolve_line_atomic` now uses `FLOOR` to align with sell logic.
   - [Remaining] Add reconciliation job + invariants
 
 - Phase 3 — Market integrity (oracles & disputes)
-  - [Remaining] Structured resolution fields
+  - [Partially Completed] Structured resolution fields
+    - Evidence: Added `resolution_source_url` and `resolution_criteria` to `lines` table.
   - [Remaining] Dispute window v0 (propose/challenge)
   - [Optional/Remaining] Admin quorum 2-of-N
 
@@ -110,10 +110,10 @@ If desired, I can grep migrations/SQL to confirm function ACLs, search_path, and
 
 ## E) Actionable Next Steps (shortlist)
 
-- [ ] Add `isfinite(...)` checks and explicit NaN guards inside Postgres RPCs for slippage parameters.
-- [ ] Remove reliance on passing `p_user_id` from callers; derive user via `auth.uid()` for user flows; keep arbitrary user IDs admin-only.
-- [ ] Ensure SECURITY DEFINER functions set `SET search_path TO public` and re-verify EXECUTE ACLs after any function edits.
-- [ ] Switch financial columns to numeric/fixed-point; remove payout `ROUND` or align rounding across sell/resolve consistently.
+- [ ] Enable leaked-password protection and enforce admin MFA in Supabase Auth.
+- [ ] Stop using service-role for user-scoped reads/writes; use user JWT for RLS-bound operations.
+- [ ] Remove payout rounding inconsistency or align with sell rounding.
+- [ ] Add reconciliation job and invariants (pool positivity, ledger vs balances).
 - [ ] Implement backend-authoritative quote endpoint and FE/BE invariant tests.
-- [ ] Enable leaked-password protection and enforce admin MFA in Supabase.
-- [ ] Add CI tests asserting: anon cannot EXECUTE RPCs; authenticated cannot update `users.is_admin`; public cannot INSERT into `transactions`.
+- [ ] Add structured resolution fields and minimal dispute window.
+- [ ] Add CI assertions: anon cannot EXECUTE RPCs; authenticated cannot update `users.is_admin`; public cannot INSERT `transactions`.

@@ -8,8 +8,9 @@ import PriceChart from '../components/PriceChart';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { formatDateFull } from '../utils/formatters';
 import { useCurrentTime } from '../hooks/useCurrentTime';
+import { useDebounce } from '../hooks/useDebounce';
 import { isMarketOpen } from '../utils/market';
-import { calculateEstimatedShares, calculateCostForShares, calculateSellValue } from '../utils/cpmm';
+import { calculateEstimatedShares, calculateSellValue } from '../utils/cpmm';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { REFETCH_INTERVALS, DEFAULTS } from '../constants';
 
@@ -34,11 +35,42 @@ export default function LineDetail() {
   const [trading, setTrading] = useState(false);
   const [error, setError] = useState('');
 
+  const debouncedStake = useDebounce(stake, 500);
+  const debouncedTargetShares = useDebounce(targetShares, 500);
+  const debouncedSellShares = useDebounce(sellShares, 500);
+
   const { data: line, isLoading: loadingLine } = useQuery({
     queryKey: ['line', id],
     queryFn: async () => (await linesApi.getOne(id!)).data,
     enabled: !!id,
     refetchInterval: REFETCH_INTERVALS.MARKET_DATA,
+  });
+
+  const quoteParams = useMemo(() => {
+    if (!line || !user) return null;
+    if (tradeMode === 'buy') {
+      if (buyMode === 'amount' && debouncedStake > 0) {
+        return { amount: debouncedStake, type: 'buy_amount' as const };
+      }
+      if (buyMode === 'shares' && debouncedTargetShares > 0) {
+        return { amount: debouncedTargetShares, type: 'buy_shares' as const };
+      }
+    } else {
+      if (debouncedSellShares > 0) {
+        return { amount: debouncedSellShares, type: 'sell_shares' as const };
+      }
+    }
+    return null;
+  }, [line, user, tradeMode, buyMode, outcome, debouncedStake, debouncedTargetShares, debouncedSellShares]);
+
+  const { data: quote, isLoading: loadingQuote } = useQuery({
+    queryKey: ['quote', id, outcome, quoteParams],
+    queryFn: async () => {
+      if (!quoteParams) return null;
+      return (await betsApi.getQuote(id!, outcome, quoteParams.amount, quoteParams.type)).data;
+    },
+    enabled: !!id && !!quoteParams,
+    staleTime: 5000, 
   });
 
   const { data: history = [] } = useQuery({
@@ -70,6 +102,7 @@ export default function LineDetail() {
   }, [myBets, outcome]);
 
   const getSellValue = (shares: number, out: 'yes' | 'no') => {
+    // Deprecated in favor of quote endpoint, but kept for sync validation if needed
     if (!line || shares <= 0) return 0;
     return calculateSellValue({ yes_pool: line.yes_pool, no_pool: line.no_pool }, shares, out);
   };
@@ -78,7 +111,32 @@ export default function LineDetail() {
     e.preventDefault();
     if (!line || !user) return;
 
-    const finalStake = buyMode === 'amount' ? stake : Math.ceil(getEstCost);
+    // Use quote data if available, otherwise fallback to local estimate (or block)
+    // For simplicity, we trust the user input and the backend will verify again.
+    
+    // If buying by shares, we need to know the cost
+    let finalStake = stake;
+    let minSharesOut = 0;
+
+    if (buyMode === 'shares') {
+       if (!quote || quote.type !== 'buy_shares') {
+         setError('Please wait for quote...');
+         return;
+       }
+       finalStake = Math.ceil(quote.amount_out); // Cost
+       minSharesOut = targetShares * (1 - DEFAULTS.SLIPPAGE_TOLERANCE);
+    } else {
+       // Buy by amount
+       finalStake = stake;
+       // If we have a quote, use it for minSharesOut
+       if (quote && quote.type === 'buy_amount') {
+         minSharesOut = quote.amount_out * (1 - DEFAULTS.SLIPPAGE_TOLERANCE);
+       } else {
+         // Fallback to local estimate if quote not ready (not ideal but unblocks)
+         const est = calculateEstimatedShares({ yes_pool: line.yes_pool, no_pool: line.no_pool }, stake, outcome);
+         minSharesOut = est * (1 - DEFAULTS.SLIPPAGE_TOLERANCE);
+       }
+    }
 
     if (finalStake > user.karma_balance) {
       setError(`Insufficient GOOS. Available: ${user.karma_balance}`);
@@ -89,11 +147,15 @@ export default function LineDetail() {
     setError('');
 
     try {
-      const minSharesOut = getEstShares * (1 - DEFAULTS.SLIPPAGE_TOLERANCE);
+      // We calculated minSharesOut above
       await betsApi.place(line.id, outcome, finalStake, minSharesOut);
       await refetchData();
-      toast.success(`Bought ${getEstShares.toFixed(0)} ${outcome.toUpperCase()} shares for ${finalStake} GOOS`);
-      setStake(100);
+      
+      const sharesBought = buyMode === 'shares' ? targetShares : (quote?.amount_out || 0);
+      toast.success(`Bought ~${sharesBought.toFixed(0)} ${outcome.toUpperCase()} shares for ${finalStake} GOOS`);
+      
+      if (buyMode === 'amount') setStake(100);
+      else setTargetShares(DEFAULTS.INITIAL_SHARES);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Order failed';
       setError(errorMessage);
@@ -116,7 +178,14 @@ export default function LineDetail() {
     setError('');
 
     try {
-      const value = getSellValue(sellShares, outcome);
+      // Use quote for values if available
+      let value = 0;
+      if (quote && quote.type === 'sell_shares') {
+        value = quote.amount_out;
+      } else {
+        value = getSellValue(sellShares, outcome);
+      }
+      
       const valueInt = Math.floor(value);
       const minAmountOut = Math.floor(value * (1 - DEFAULTS.SLIPPAGE_TOLERANCE));
       await betsApi.sell(line.id, outcome, sellShares, minAmountOut);
@@ -134,17 +203,38 @@ export default function LineDetail() {
 
   const isOpen = line ? isMarketOpen(line, now) : false;
 
-  const pool = line ? { yes_pool: line.yes_pool, no_pool: line.no_pool } : { yes_pool: 0, no_pool: 0 };
-  
-  const getEstShares = buyMode === 'amount' 
-    ? calculateEstimatedShares(pool, stake, outcome)
-    : targetShares;
-    
-  const getEstCost = buyMode === 'amount'
-    ? stake
-    : calculateCostForShares(pool, targetShares, outcome);
+  // Display values derived from Quote if available, otherwise 0 or loading
+  const displayEstShares = useMemo(() => {
+    if (loadingQuote) return 0;
+    if (!quote) return 0;
+    if (buyMode === 'amount' && quote.type === 'buy_amount') return quote.amount_out;
+    if (buyMode === 'shares' && quote.type === 'buy_shares') return targetShares;
+    return 0;
+  }, [quote, loadingQuote, buyMode, targetShares]);
 
-  const estPrice = getEstShares > 0 ? getEstCost / getEstShares : 0;
+  const displayEstCost = useMemo(() => {
+    if (loadingQuote) return 0;
+    if (!quote) return 0;
+    if (buyMode === 'amount' && quote.type === 'buy_amount') return stake;
+    if (buyMode === 'shares' && quote.type === 'buy_shares') return quote.amount_out;
+    return 0;
+  }, [quote, loadingQuote, buyMode, stake]);
+
+  const displayEstPrice = useMemo(() => {
+    if (quote) return quote.price_per_share;
+    return 0;
+  }, [quote]);
+
+  // For sell mode
+  const displaySellValue = useMemo(() => {
+    if (tradeMode === 'sell' && quote && quote.type === 'sell_shares') return quote.amount_out;
+    return 0;
+  }, [tradeMode, quote]);
+
+  const displaySellPrice = useMemo(() => {
+    if (tradeMode === 'sell' && quote && quote.type === 'sell_shares') return quote.price_per_share;
+    return 0;
+  }, [tradeMode, quote]);
 
   if (loadingLine) return <LoadingSpinner />;
   if (!line) return <div className="error">Market not found</div>;
@@ -235,17 +325,19 @@ export default function LineDetail() {
                   {/* Simplified summary - just show profit */}
                   <div className="simple-summary">
                     <div className="profit-preview">
-                      +{(getEstShares - getEstCost).toFixed(0)} GOOS ({getEstCost > 0 ? (((getEstShares - getEstCost) / getEstCost) * 100).toFixed(0) : 0}%)
+                      {loadingQuote ? '...' : (
+                        <>+{Math.max(0, displayEstShares - displayEstCost).toFixed(0)} GOOS ({displayEstCost > 0 ? (((displayEstShares - displayEstCost) / displayEstCost) * 100).toFixed(0) : 0}%)</>
+                      )}
                     </div>
                     <div className="profit-label">Potential profit if {outcome.toUpperCase()} wins</div>
                   </div>
 
                   <button 
                     type="submit" 
-                    disabled={trading || stake > user.karma_balance || getEstCost <= 0}
+                    disabled={trading || (buyMode === 'amount' && stake > user.karma_balance) || (buyMode === 'shares' && displayEstCost > user.karma_balance) || displayEstCost <= 0}
                     className={`action-btn ${outcome}`}
                   >
-                    {trading ? 'Processing...' : `Buy ${outcome.toUpperCase()} for ${stake} GOOS`}
+                    {trading ? 'Processing...' : `Buy ${outcome.toUpperCase()} for ${displayEstCost > 0 ? displayEstCost.toFixed(0) : (buyMode === 'amount' ? stake : '...')} GOOS`}
                   </button>
                   
                   <div className="balance-hint">
@@ -298,19 +390,19 @@ export default function LineDetail() {
                       <div className="order-summary-card">
                         <div className="summary-row">
                           <span className="summary-label">Avg Price</span>
-                          <span className="summary-val">GOOS {estPrice.toFixed(2)}</span>
+                          <span className="summary-val">GOOS {loadingQuote ? '...' : displayEstPrice.toFixed(2)}</span>
                         </div>
                         <div className="summary-row">
                           <span className="summary-label">Est Shares</span>
-                          <span className="summary-val">{getEstShares.toFixed(2)}</span>
+                          <span className="summary-val">{loadingQuote ? '...' : displayEstShares.toFixed(2)}</span>
                         </div>
                         <div className="summary-row">
                           <span className="summary-label">Payout if {outcome.toUpperCase()} wins</span>
-                          <span className="summary-val">GOOS {getEstShares.toFixed(0)}</span>
+                          <span className="summary-val">GOOS {loadingQuote ? '...' : displayEstShares.toFixed(0)}</span>
                         </div>
                         <div className="summary-row">
                           <span className="summary-label">Total Cost</span>
-                          <span className="summary-val">GOOS {getEstCost.toFixed(2)}</span>
+                          <span className="summary-val">GOOS {loadingQuote ? '...' : displayEstCost.toFixed(2)}</span>
                         </div>
                       </div>
                     </div>
@@ -352,11 +444,11 @@ export default function LineDetail() {
                      </div>
                      <div className="summary-row">
                        <span className="summary-label">Est. Sell Price</span>
-                       <span className="summary-val">GOOS {sellShares > 0 ? (Math.floor(getSellValue(sellShares, outcome)) / sellShares).toFixed(2) : '0.00'}</span>
+                       <span className="summary-val">GOOS {loadingQuote ? '...' : (displaySellPrice > 0 ? displaySellPrice.toFixed(2) : '0.00')}</span>
                      </div>
                      <div className="summary-row highlight">
                        <span className="summary-label">You'll Receive</span>
-                       <span className="summary-val">GOOS {Math.floor(getSellValue(sellShares, outcome)).toFixed(0)}</span>
+                       <span className="summary-val">GOOS {loadingQuote ? '...' : Math.floor(displaySellValue).toFixed(0)}</span>
                      </div>
                   </div>
 
